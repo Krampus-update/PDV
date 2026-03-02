@@ -17,6 +17,14 @@ O servidor foi iniciado localmente e o banco foi criado (veja `pdv.db` na pasta 
 
 ---
 
+## 📍 Status Atual do Projeto (Mar/2026)
+
+- **Fase atual:** **Transição Fase 4 → Fase 5**
+- **Próxima fase:** iniciar pacote de melhorias (tempo real, autenticação, relatórios e backup)
+- Entrada principal atual em `http://localhost:3000` com seleção por perfil
+
+---
+
 ## 🎬 Começar Agora
 
 ### 1️⃣ Instalar Node.js (Se não tiver)
@@ -44,28 +52,37 @@ Você verá a mensagem de inicialização e logs indicando que o banco foi inici
 Abra o navegador e acesse:
 
 ```
-http://localhost:3000/frontend/index.html
+http://localhost:3000
 ```
 
-Criei uma nova interface inicial com abas (Principal, Produtos, Configurações) para testar e usar localmente. A aba Principal mostra produtos com imagens, preços e um teclado numérico para vendas avulsas; a aba Produtos lista o estoque; Configurações permite ajustes básicos.
-Você verá uma interface interativa para testar todos os endpoints!
+A raiz agora abre a tela de acesso por perfil:
+- **Admin** → `admin.html` (tester técnico/operacional legado)
+- **Cliente** → `painel.html` no desktop e `garcom.html` no mobile
 
 ---
 
 ## 🎯 Próximas Fases Recomendadas
 
-### Fase 2: Frontend Principal (já iniciada)
+### Fase 2: Frontend Principal (consolidada) ✅
 Implementei a base do frontend e criei interfaces com abas:
 
-- `frontend/index.html` — tester antigo (manter para debug rápido)
-- `frontend/painel.html` — painel principal com abas **Principal / Produtos / Mesas / Configurações**
+- `frontend/acesso.html` — entrada principal por perfil (agora padrão em `/`)
+- `frontend/admin.html` — tester/admin legado (com `index.html` como alias de compatibilidade)
+- `frontend/painel.html` — painel principal com abas **Principal / Produtos / Comandas / Configurações**
   * **Principal**: grade de produtos clicáveis que adicionam itens ao carrinho; painel direito mostra carrinho e bloco de venda avulsa (teclado 0-9)
   * **Produtos**: visualização e gestão de estoque
-  * **Mesas**: lista de mesas abertas; clicar abre modal onde é possível adicionar produtos à comanda ou fechá‑la
+  * **Comandas**: lista de comandas abertas; clicar abre detalhe onde é possível adicionar produtos, adicionar valor avulso e fechar a comanda
   * **Configurações**: nome, modo de operação e cor de destaque
-- código JavaScript integrado na própria `painel.html` gerencia abas, carrinho, mesas e teclado numérico através da API
+- `frontend/js/painel.js` centraliza a lógica do painel (não fica mais inline no HTML)
 
-Próximo: polir estilos, adicionar imagens aos produtos, implementar atribuição de número de mesa ao criar vendas, e melhorar usabilidade do modal de mesa.
+Melhorias já aplicadas nesta fase:
+- [x] Evitar criação de comanda duplicada (reaproveita comanda aberta da mesma mesa/balcão)
+- [x] Renomeação da aba **Mesas** para **Comandas**
+- [x] Alternância **Produtos / Valor Avulso** no detalhe da comanda
+- [x] Atualização periódica de estoque/comandas para reduzir inconsistência entre telas
+- [x] Correção do bug de edição de preço (ex.: R$ 8,00 salvar como R$ 0,08)
+
+Status desta fase: consolidada e estável para operação local.
 
 ### Fase 3: Interface Garçom (estimado: 1-2 horas) ✅
 A interface do garçom já está pronta e funcional. Ela é responsiva, lista comandas abertas
@@ -78,19 +95,40 @@ Também há modal para visualização de detalhes e busca de produtos.
 - [x] Design simples e rápido
 - [x] Modal de detalhes com remoção e finalização
 - [x] Busca por produto integrada
+- [x] Alinhamento de regras com painel desktop (mobile/desktop com comportamento equivalente)
+- [x] Não duplicar comanda por mesa/balcão (reaproveita comanda aberta)
+- [x] Alternância Produtos / Valor Avulso no detalhe da comanda
+- [x] Atualização periódica de estoque/comandas para reduzir inconsistência entre telas
 
-### Fase 4: Tela de Produção (Estimado: 1-2 horas)
+### Fase 4: Tela de Produção (Estimado: 1-2 horas) ✅
 - [x] Listar pedidos em preparo
 - [x] Marcar como pronto
-- [x] Notificações sonoras
+- [x] Notificações sonoras de novos pedidos
 - [x] Código de cores por tipo
+- [x] Flag por produto para envio à cozinha (`vai_cozinha`)
+- [x] Integração com painel/garçom: ao adicionar item de cozinha, comanda vai para `em_preparo`
+- [x] Tela de produção exibe apenas itens de cozinha e separa abas `em_preparo` / `pronta`
+- [x] Fluxo cozinha validado em runtime (criação de comanda → item de cozinha → produção)
+
+Status desta fase: concluída.
 
 ### Fase 5: Melhorias (Estimado: 2-3 horas)
-- [x] WebSockets (tempo real)
-- [x] Autenticação/Login
-- [x] Relatórios de vendas
-- [x] Backup automático
-- [x] Histórico de transações
+- [ ] WebSockets (tempo real)
+- [ ] Autenticação/Login
+- [ ] Relatórios de vendas
+- [ ] Backup automático
+- [ ] Histórico de transações (completo)
+
+Preparativos já iniciados para Fase 5:
+- [x] Tabela `historico_transacoes` criada no backend
+- [x] Registro automático de eventos principais (produto/venda/item)
+- [x] Endpoint de leitura de histórico: `GET /api/historico`
+
+### Fase 6: Deploy (Estimado: 2-3 horas)
+- [x] Configuração para rodar como serviço no Windows
+- [x] Configuração de ambiente (variáveis, etc.)
+- [x] Guia de deploy para produção
+- [x] correção de bugs e melhorias pós-deploy
 
 ---
 
@@ -112,7 +150,7 @@ Todos estes arquivos foram criados para você:
    - Checklist de funcionalidades
    - Estrutura do banco de dados
 
-5. **frontend/index.html** - Tester da API
+5. **frontend/admin.html** - Tester/Admin da API
    - Interface visual para testar endpoints
    - Sem necessidade de cURL
 
@@ -180,10 +218,12 @@ http://localhost:3000
 
 ### Teste 2: Testar a API com HTML
 ```bash
-# Abra o arquivo tester
-http://localhost:3000/frontend/index.html
+# Abra a tela de acesso
+http://localhost:3000
 
-# Use a interface para testar
+# Depois selecione:
+# - Admin (tester técnico)
+# - Cliente (painel operacional)
 ```
 
 ### Teste 3: Criar fluxo completo
@@ -226,9 +266,12 @@ PDV/
 │   └── package.json ✅
 │
 ├── frontend/
-│   ├── index.html ✅  (Tester + Dashboard)
-│   ├── pdv.html ⏳    (Interface Caixa)
-│   ├── garcom.html ⏳ (Interface Garçom)
+│   ├── acesso.html ✅  (Entrada por perfil)
+│   ├── admin.html ✅   (Tester/Admin)
+│   ├── index.html ✅   (Alias para admin.html)
+│   ├── painel.html ✅  (Cliente desktop)
+│   ├── garcom.html ⏳  (Cliente mobile / alinhamento final)
+│   ├── pdv.html ⏳     (Interface Caixa)
 │   ├── producao.html ⏳ (Tela de Produção)
 │   ├── css/ ⏳
 │   └── js/ ⏳
@@ -258,7 +301,7 @@ npm start
 curl http://localhost:3000/api/status
 
 # 5. No navegador, abra
-http://localhost:3000/frontend/index.html
+http://localhost:3000
 ```
 
 ---

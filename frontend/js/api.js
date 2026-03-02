@@ -87,6 +87,11 @@ class API {
         return this.request('GET', '/vendas/preparacao/em-preparo');
     }
 
+    static async obterProducao(status = 'em_preparo') {
+        const query = status ? `?status=${encodeURIComponent(status)}` : '';
+        return this.request('GET', `/vendas/preparacao${query}`);
+    }
+
     // ===== ITENS DA VENDA =====
     static async adicionarItem(vendaId, produtoId, quantidade) {
         return this.request('POST', `/vendas/${vendaId}/itens`, {

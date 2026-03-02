@@ -1,9 +1,23 @@
 import ProdutoModel from '../models/ProdutoModel.js';
+import HistoricoModel from '../models/HistoricoModel.js';
+
+async function registrarHistorico(acao, entidade_id, detalhes = null) {
+  try {
+    await HistoricoModel.registrar({
+      tipo_entidade: 'produto',
+      entidade_id,
+      acao,
+      detalhes
+    });
+  } catch (e) {
+    console.warn('Falha ao registrar histórico de produto:', e.message);
+  }
+}
 
 class ProdutoController {
   static async criar(req, res) {
     try {
-      const { nome, preco, estoque, estoque_minimo, tipo, imagem } = req.body;
+      const { nome, preco, estoque, estoque_minimo, tipo, imagem, vai_cozinha } = req.body;
 
       if (!nome || !preco) {
         return res.status(400).json({ error: 'Nome e preço são obrigatórios' });
@@ -15,13 +29,15 @@ class ProdutoController {
         estoque: parseInt(estoque) || 0,
         estoque_minimo: parseInt(estoque_minimo) || 0,
         tipo: tipo || 'simples',
-        imagem: imagem || null
+        imagem: imagem || null,
+        vai_cozinha: vai_cozinha === true || vai_cozinha === 1 || vai_cozinha === '1'
       });
 
       res.status(201).json({ 
         message: 'Produto criado com sucesso',
         id: id
       });
+      await registrarHistorico('produto_criado', id, { nome, preco: parseFloat(preco) });
     } catch (error) {
       console.error('Erro ao criar produto:', error);
       if (error.message.includes('UNIQUE')) {
@@ -61,7 +77,10 @@ class ProdutoController {
   static async atualizar(req, res) {
     try {
       const { id } = req.params;
-      const dados = req.body;
+      const dados = { ...req.body };
+      if (Object.prototype.hasOwnProperty.call(dados, 'vai_cozinha')) {
+        dados.vai_cozinha = dados.vai_cozinha === true || dados.vai_cozinha === 1 || dados.vai_cozinha === '1';
+      }
 
       const produto = await ProdutoModel.obterPorId(id);
       if (!produto) {
@@ -69,6 +88,7 @@ class ProdutoController {
       }
 
       await ProdutoModel.atualizar(id, dados);
+      await registrarHistorico('produto_atualizado', parseInt(id, 10), dados);
       res.json({ message: 'Produto atualizado com sucesso' });
     } catch (error) {
       console.error('Erro ao atualizar produto:', error);
@@ -87,6 +107,7 @@ class ProdutoController {
 
       // Soft delete - marcar como inativo
       await ProdutoModel.atualizar(id, { ativo: 0 });
+      await registrarHistorico('produto_deletado', parseInt(id, 10), { nome: produto.nome });
       res.json({ message: 'Produto deletado com sucesso' });
     } catch (error) {
       console.error('Erro ao deletar produto:', error);

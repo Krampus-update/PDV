@@ -1,11 +1,25 @@
 import VendaModel from '../models/VendaModel.js';
 import VendaItemModel from '../models/VendaItemModel.js';
 import ProdutoModel from '../models/ProdutoModel.js';
+import HistoricoModel from '../models/HistoricoModel.js';
 
 // considera produto avulso qualquer item com nome iniciando por "Avulso" ou
 // com estoque muito alto (marca temporários gerados para venda avulsa).
 function isAvulso(produto){
   return (produto.nome && produto.nome.startsWith('Avulso')) || produto.estoque >= 9999;
+}
+
+async function registrarHistorico(acao, entidade_id, detalhes = null) {
+  try {
+    await HistoricoModel.registrar({
+      tipo_entidade: 'venda',
+      entidade_id,
+      acao,
+      detalhes
+    });
+  } catch (e) {
+    console.warn('Falha ao registrar histórico de venda:', e.message);
+  }
 }
 
 class VendaController {
@@ -24,6 +38,7 @@ class VendaController {
       });
 
       res.status(201).json(venda);
+      await registrarHistorico('venda_criada', venda.id, { tipo, mesa: mesa || null });
     } catch (error) {
       console.error('Erro ao criar venda:', error);
       res.status(500).json({ error: error.message });
@@ -71,12 +86,13 @@ class VendaController {
 
   static async obterEmPreparo(req, res) {
     try {
-      const vendas = await VendaModel.obterEmPreparo();
+      const { status } = req.query;
+      const vendas = status ? await VendaModel.obterParaProducao(status) : await VendaModel.obterEmPreparo();
       
       // Enriquecer com itens
       const vendasComItens = await Promise.all(
         vendas.map(async (venda) => {
-          const itens = await VendaItemModel.obterPorVenda(venda.id);
+          const itens = (await VendaItemModel.obterPorVenda(venda.id)).filter((i) => Number(i.produto_vai_cozinha) === 1);
           return { ...venda, itens };
         })
       );
@@ -133,6 +149,14 @@ class VendaController {
           await ProdutoModel.atualizarEstoque(produto_id, -quantidade);
         }
         await VendaModel.obterTotal(id);
+        if (Number(produto.vai_cozinha) === 1 && ['aberta', 'pronta'].includes(venda.status)) {
+          await VendaModel.atualizar(id, { status: 'em_preparo' });
+        }
+        await registrarHistorico('item_quantidade_incrementada', parseInt(id, 10), {
+          item_id: existente.id,
+          produto_id,
+          quantidade_adicionada: quantidade
+        });
         return res.status(200).json({
           message: 'Quantidade de item atualizada',
           item_id: existente.id,
@@ -159,6 +183,10 @@ class VendaController {
 
       // Atualizar total da venda
       await VendaModel.obterTotal(id);
+      if (Number(produto.vai_cozinha) === 1 && ['aberta', 'pronta'].includes(venda.status)) {
+        await VendaModel.atualizar(id, { status: 'em_preparo' });
+      }
+      await registrarHistorico('item_adicionado', parseInt(id, 10), { item_id: itemId, produto_id, quantidade });
 
       res.status(201).json({
         message: 'Item adicionado com sucesso',
@@ -188,6 +216,11 @@ class VendaController {
 
       // Atualizar total
       await VendaModel.obterTotal(id);
+      await registrarHistorico('item_removido', parseInt(id, 10), {
+        item_id: parseInt(item_id, 10),
+        produto_id: item.produto_id,
+        quantidade: item.quantidade
+      });
 
       res.json({ message: 'Item removido com sucesso' });
     } catch (error) {
@@ -208,6 +241,10 @@ class VendaController {
       const item = await VendaItemModel.obterPorId(item_id);
       if (!item) {
         return res.status(404).json({ error: 'Item não encontrado' });
+      }
+      const venda = await VendaModel.obterPorId(id);
+      if (!venda) {
+        return res.status(404).json({ error: 'Venda não encontrada' });
       }
 
       const produto = await ProdutoModel.obterPorId(item.produto_id);
@@ -237,6 +274,13 @@ class VendaController {
 
       // Atualizar total
       await VendaModel.obterTotal(id);
+      if (Number(produto.vai_cozinha) === 1 && ['aberta', 'pronta'].includes(venda.status)) {
+        await VendaModel.atualizar(id, { status: 'em_preparo' });
+      }
+      await registrarHistorico('item_atualizado', parseInt(id, 10), {
+        item_id: parseInt(item_id, 10),
+        quantidade
+      });
 
       res.json({ message: 'Item atualizado com sucesso', quantidade, subtotal: novoSubtotal });
     } catch (error) {
@@ -263,6 +307,7 @@ class VendaController {
         status: 'fechada',
         forma_pagamento
       });
+      await registrarHistorico('venda_fechada', parseInt(id, 10), { forma_pagamento });
 
       res.json({ message: 'Venda fechada com sucesso' });
     } catch (error) {
@@ -280,11 +325,8 @@ class VendaController {
         return res.status(404).json({ error: 'Venda não encontrada' });
       }
 
-      if (venda.tipo !== 'fastfood') {
-        return res.status(400).json({ error: 'Apenas vendas fast food podem ser marcadas como prontas' });
-      }
-
       await VendaModel.atualizar(id, { status: 'pronta' });
+      await registrarHistorico('venda_marcada_pronta', parseInt(id, 10), null);
 
       res.json({ message: 'Pedido marcado como pronto' });
     } catch (error) {
@@ -308,6 +350,7 @@ class VendaController {
       }
 
       await VendaModel.atualizar(id, { status });
+      await registrarHistorico('status_atualizado', parseInt(id, 10), { status });
 
       res.json({ message: 'Status atualizado com sucesso' });
     } catch (error) {

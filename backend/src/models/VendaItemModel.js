@@ -23,7 +23,7 @@ class VendaItemModel {
 
   static async obterPorVenda(venda_id) {
     return dbAll(
-      `SELECT vi.*, p.nome as produto_nome, p.tipo as produto_tipo 
+      `SELECT vi.*, p.nome as produto_nome, p.tipo as produto_tipo, p.vai_cozinha as produto_vai_cozinha
        FROM venda_itens vi 
        JOIN produtos p ON vi.produto_id = p.id 
        WHERE vi.venda_id = ? 
@@ -68,7 +68,8 @@ class VendaItemModel {
         vi.observacoes,
         p.id as produto_id,
         p.nome as produto_nome,
-        p.tipo as produto_tipo
+        p.tipo as produto_tipo,
+        p.vai_cozinha as produto_vai_cozinha
        FROM venda_itens vi 
        JOIN produtos p ON vi.produto_id = p.id 
        WHERE vi.venda_id = ?`,

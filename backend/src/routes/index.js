@@ -1,6 +1,7 @@
 import express from 'express';
 import produtosRoutes from './produtos.js';
 import vendasRoutes from './vendas.js';
+import historicoRoutes from './historico.js';
 
 const router = express.Router();
 
@@ -12,7 +13,8 @@ router.get('/', (req, res) => {
     endpoints: {
       status: '/api/status',
       produtos: '/api/produtos',
-      vendas: '/api/vendas'
+      vendas: '/api/vendas',
+      historico: '/api/historico'
     }
   });
 });
@@ -20,6 +22,7 @@ router.get('/', (req, res) => {
 // Rotas da API
 router.use('/produtos', produtosRoutes);
 router.use('/vendas', vendasRoutes);
+router.use('/historico', historicoRoutes);
 
 // Health check
 router.get('/status', (req, res) => {

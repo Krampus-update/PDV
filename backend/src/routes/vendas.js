@@ -14,6 +14,7 @@ router.get('/abertas', VendaController.obterAbertas);
 
 // Obter pedidos em preparo (fastfood)
 router.get('/preparacao/em-preparo', VendaController.obterEmPreparo);
+router.get('/preparacao', VendaController.obterEmPreparo);
 
 // Obter venda específica
 router.get('/:id', VendaController.obterPorId);

@@ -70,7 +70,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function obterComandaAbertaPorMesa(mesaInformada) {
     const chave = normalizarMesa(mesaInformada);
-    const vendas = await API.obterVendas({ tipo: 'bar', status: 'aberta' });
+    const vendas = await API.obterVendasAbertas('bar');
     return vendas.find((v) => normalizarMesa(v.mesa) === chave) || null;
   }
 
@@ -180,8 +180,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (totalEl) totalEl.textContent = formatarMoedaBR(carrinho.reduce((s, i) => s + i.subtotal, 0));
   }
 
-  async function removerItemMesa(vendaId, itemId) {
-    if (!confirm('Remover item da comanda?')) return;
+  async function removerItemMesa(vendaId, itemId, skipConfirm = false) {
+    if (!skipConfirm && !confirm('Remover item da comanda?')) return;
     try {
       await API.removerItem(vendaId, itemId);
       const updated = await API.obterVenda(vendaId);
@@ -193,6 +193,11 @@ document.addEventListener('DOMContentLoaded', () => {
       console.error('Erro ao remover item', e);
       alert('Erro ao remover item');
     }
+  }
+
+  async function cancelarPedidoItem(vendaId, itemId) {
+    if (!confirm('Cancelar este pedido da comanda?')) return;
+    await removerItemMesa(vendaId, itemId, true);
   }
 
   async function alterarQuantidadeMesa(vendaId, itemId, delta) {
@@ -218,6 +223,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   window.removerItemMesa = removerItemMesa;
+  window.cancelarPedidoItem = cancelarPedidoItem;
   window.alterarQuantidadeMesa = alterarQuantidadeMesa;
 
   function removerDoCarrinho(idx) {
@@ -242,7 +248,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function carregarMesas() {
     try {
-      const vendas = await API.obterVendas({ tipo: 'bar', status: 'aberta' });
+      const vendas = await API.obterVendasAbertas('bar');
       const el = document.getElementById('listaMesas');
       if (!el) return;
       if (!vendas || vendas.length === 0) {
@@ -284,11 +290,25 @@ document.addEventListener('DOMContentLoaded', () => {
       prodGrid += filtered
         .map(
           (p) =>
-            `<div class="produto-mesa-card" data-id="${p.id}" style="cursor:pointer"><div class="produto-mesa-card-img">IMG</div><div class="produto-mesa-card-name">${p.nome}</div><div class="produto-mesa-card-price">${formatarMoedaBR(p.preco)}</div><div style="font-size:10px;color:#0a7;margin-top:4px">${p.estoque} disponíveis</div></div>`
+            `<div class="produto-mesa-card" data-id="${p.id}" style="cursor:pointer"><div class="produto-mesa-card-img">IMG</div><div class="produto-mesa-card-name">${p.nome}</div><div class="produto-mesa-card-price">${formatarMoedaBR(p.preco)}</div><div style="font-size:10px;color:#0a7;margin-top:4px">${p.estoque} disponíveis${Number(p.vai_cozinha || 0) === 1 ? ' • cozinha' : ''}</div></div>`
         )
         .join('');
       prodGrid += '</div>';
     }
+
+    const getStatusItem = (item) => {
+      const vaiCozinha = Number(item.produto_vai_cozinha || 0) === 1;
+      if (!vaiCozinha) {
+        return { label: 'Liberado', color: '#607D8B', bg: 'rgba(96,125,139,0.12)' };
+      }
+      if (venda.status === 'pronta') {
+        return { label: 'Pronto', color: '#2E7D32', bg: 'rgba(76,175,80,0.15)' };
+      }
+      if (venda.status === 'em_preparo') {
+        return { label: 'Em preparo', color: '#EF6C00', bg: 'rgba(255,152,0,0.15)' };
+      }
+      return { label: 'Aguardando', color: '#1565C0', bg: 'rgba(33,150,243,0.15)' };
+    };
 
     sideEl.innerHTML = `
       <div class="sidebar-section">
@@ -296,7 +316,29 @@ document.addEventListener('DOMContentLoaded', () => {
         <div style="font-size:12px;margin-bottom:8px">Total: <strong style="color:var(--success)">${formatarMoedaBR(venda.total || 0)}</strong></div>
         <h4 style="margin:8px 0 4px;font-size:12px">Itens</h4>
         <div class="mesa-items-list">
-          ${itens.length === 0 ? '<p style="color:#666;margin:0">Sem itens</p>' : itens.map((i) => `<div class="mesa-item" style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #eee;font-size:12px"><div style="flex:1"><div>${i.produto_nome}</div><div style="font-size:10px;color:#999">x${i.quantidade}</div></div><div style="display:flex;gap:4px;align-items:center"><button onclick="alterarQuantidadeMesa(${venda.id},${i.id},-1)" style="padding:2px 4px;font-size:10px;border:1px solid #ccc;background:#fff;cursor:pointer;border-radius:2px">-</button><span style="min-width:18px;text-align:center;font-size:10px">${i.quantidade}</span><button onclick="alterarQuantidadeMesa(${venda.id},${i.id},1)" style="padding:2px 4px;font-size:10px;border:1px solid #ccc;background:#fff;cursor:pointer;border-radius:2px">+</button><button onclick="removerItemMesa(${venda.id},${i.id})" style="padding:2px 4px;font-size:10px;background:var(--danger);color:white;border:none;cursor:pointer;border-radius:2px">✕</button></div><span style="color:var(--success);font-weight:bold;min-width:50px;text-align:right">${formatarMoedaBR(i.subtotal)}</span></div>`).join('')}
+          ${
+            itens.length === 0
+              ? '<p style="color:#666;margin:0">Sem itens</p>'
+              : itens
+                  .map((i) => {
+                    const st = getStatusItem(i);
+                    return `<div class="mesa-item" style="display:flex;justify-content:space-between;align-items:center;padding:6px;border-bottom:1px solid #eee;font-size:12px;border-left:4px solid ${st.color};background:${st.bg}">
+                      <div style="flex:1">
+                        <div>${i.produto_nome}</div>
+                        <div style="font-size:10px;color:#999">x${i.quantidade}</div>
+                        <div style="display:inline-block;margin-top:2px;padding:1px 6px;border-radius:10px;font-size:10px;color:${st.color};background:#fff">${st.label}</div>
+                      </div>
+                      <div style="display:flex;gap:4px;align-items:center">
+                        <button onclick="alterarQuantidadeMesa(${venda.id},${i.id},-1)" style="padding:2px 4px;font-size:10px;border:1px solid #ccc;background:#fff;cursor:pointer;border-radius:2px">-</button>
+                        <span style="min-width:18px;text-align:center;font-size:10px">${i.quantidade}</span>
+                        <button onclick="alterarQuantidadeMesa(${venda.id},${i.id},1)" style="padding:2px 4px;font-size:10px;border:1px solid #ccc;background:#fff;cursor:pointer;border-radius:2px">+</button>
+                        <button onclick="cancelarPedidoItem(${venda.id},${i.id})" style="padding:2px 6px;font-size:10px;background:var(--danger);color:white;border:none;cursor:pointer;border-radius:2px">Cancelar</button>
+                      </div>
+                      <span style="color:var(--success);font-weight:bold;min-width:50px;text-align:right">${formatarMoedaBR(i.subtotal)}</span>
+                    </div>`;
+                  })
+                  .join('')
+          }
         </div>
         <hr style="margin:12px 0;border:none;border-top:1px solid #eee" />
         <div style="display:flex;gap:6px;margin-bottom:8px">
@@ -431,7 +473,7 @@ document.addEventListener('DOMContentLoaded', () => {
     el.innerHTML = filtered
       .map((p) => {
         const semEstoque = Number(p.estoque || 0) <= 0;
-        return `<div class="product-card ${semEstoque ? 'sem-estoque' : ''}" data-id="${p.id}" data-nome="${p.nome}" data-preco="${p.preco}" style="${semEstoque ? 'opacity:.55;cursor:not-allowed;' : ''}">\n      <div class="product-image">${p.imagem ? `<img src="${p.imagem}" style="width:100%;height:100%;object-fit:cover"/>` : 'IMG'}</div>\n      <div class="product-name">${p.nome}</div>\n      <div class="product-price">${formatarMoedaBR(p.preco)}</div>\n      <div class="product-meta">${p.estoque} em estoque</div>\n    </div>`;
+        return `<div class="product-card ${semEstoque ? 'sem-estoque' : ''}" data-id="${p.id}" data-nome="${p.nome}" data-preco="${p.preco}" style="${semEstoque ? 'opacity:.55;cursor:not-allowed;' : ''}">\n      <div class="product-image">${p.imagem ? `<img src="${p.imagem}" style="width:100%;height:100%;object-fit:cover"/>` : 'IMG'}</div>\n      <div class="product-name">${p.nome}</div>\n      <div class="product-price">${formatarMoedaBR(p.preco)}</div>\n      <div class="product-meta">${p.estoque} em estoque${Number(p.vai_cozinha || 0) === 1 ? ' • cozinha' : ''}</div>\n    </div>`;
       })
       .join('');
     el.querySelectorAll('.product-card').forEach((card) => {
@@ -456,7 +498,7 @@ document.addEventListener('DOMContentLoaded', () => {
     el.innerHTML = filtered
       .map(
         (p) =>
-          `<div class="product-list-item" data-id="${p.id}"><div><div class="product-list-item-name">#${p.id} ${p.nome}</div><div style="font-size:11px;color:#999">${p.tipo}</div></div><div class="product-list-item-info"><span class="qty">${p.estoque} un</span><span class="price">${formatarMoedaBR(p.preco)}</span><button onclick="deletarProduto(${p.id})" class="delete-btn">X</button></div></div>`
+          `<div class="product-list-item" data-id="${p.id}"><div><div class="product-list-item-name">#${p.id} ${p.nome}</div><div style="font-size:11px;color:#999">${p.tipo}${Number(p.vai_cozinha || 0) === 1 ? ' • cozinha' : ''}</div></div><div class="product-list-item-info"><span class="qty">${p.estoque} un</span><span class="price">${formatarMoedaBR(p.preco)}</span><button onclick="deletarProduto(${p.id})" class="delete-btn">X</button></div></div>`
       )
       .join('');
     el.querySelectorAll('.product-list-item').forEach((item) => {
@@ -528,6 +570,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const nome = document.getElementById('novoProdutoNome').value || '';
       const preco = precoTeclado && precoTeclado.getValue();
       const estoque = parseInt(document.getElementById('novoProdutoEstoque').value, 10) || 0;
+      const vaiCozinha = !!document.getElementById('novoProdutoVaiCozinha')?.checked;
       if (!nome.trim() || isNaN(preco)) {
         alert('Preencha nome e preço');
         return;
@@ -542,11 +585,25 @@ document.addEventListener('DOMContentLoaded', () => {
       try {
         if (window.produtoSelecionado) {
           btnCriarProduto.textContent = 'Atualizando...';
-          await API.atualizarProduto(window.produtoSelecionado, { nome, preco, estoque, imagem: produtoImagemBase64 });
+          await API.atualizarProduto(window.produtoSelecionado, {
+            nome,
+            preco,
+            estoque,
+            imagem: produtoImagemBase64,
+            vai_cozinha: vaiCozinha
+          });
           alert('Produto atualizado!');
         } else {
           btnCriarProduto.textContent = 'Criando...';
-          await API.criarProduto({ nome, preco, estoque, estoque_minimo: 0, tipo: 'simples', imagem: produtoImagemBase64 });
+          await API.criarProduto({
+            nome,
+            preco,
+            estoque,
+            estoque_minimo: 0,
+            tipo: 'simples',
+            imagem: produtoImagemBase64,
+            vai_cozinha: vaiCozinha
+          });
           alert('Produto criado com sucesso!');
         }
         limparFormularioProduto();
@@ -569,6 +626,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (precoTeclado) precoTeclado.clear();
     const estoqueEl = document.getElementById('novoProdutoEstoque');
     if (estoqueEl) estoqueEl.value = '0';
+    const cozinhaEl = document.getElementById('novoProdutoVaiCozinha');
+    if (cozinhaEl) cozinhaEl.checked = false;
     const inputImg = document.getElementById('novoProdutoImagem');
     if (inputImg) inputImg.value = '';
     const preview = document.getElementById('previewImagem');
@@ -591,6 +650,8 @@ document.addEventListener('DOMContentLoaded', () => {
       if (precoTeclado) precoTeclado.setValue(prod.preco);
       const estoqueEl = document.getElementById('novoProdutoEstoque');
       if (estoqueEl) estoqueEl.value = prod.estoque || 0;
+      const cozinhaEl = document.getElementById('novoProdutoVaiCozinha');
+      if (cozinhaEl) cozinhaEl.checked = Number(prod.vai_cozinha || 0) === 1;
       if (prod.imagem) {
         produtoImagemBase64 = prod.imagem;
         const preview = document.getElementById('previewImagem');

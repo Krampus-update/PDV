@@ -1,4 +1,4 @@
-// Tela de Produção - listar pedidos fastfood em preparo e marcar como pronto
+// Tela de Produção (cozinha): mostra apenas itens marcados para cozinha.
 
 document.addEventListener('DOMContentLoaded', () => {
   const gridPedidos = document.getElementById('gridPedidos');
@@ -19,88 +19,193 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let pedidos = [];
   let pedidoAtivo = null;
+  let statusAtivo = 'em_preparo';
+  let refreshRodando = false;
+  let idsEmPreparo = new Set();
+
+  function tocarAlertaNovoPedido() {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      gain.gain.setValueAtTime(0.001, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.12, ctx.currentTime + 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.35);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.36);
+    } catch (e) {
+      console.warn('Falha ao tocar alerta sonoro:', e);
+    }
+  }
+
+  function tituloComanda(venda) {
+    if (venda?.mesa) return `Mesa ${venda.mesa}`;
+    return `Balcão #${venda?.id || '--'}`;
+  }
 
   async function carregarPedidos() {
     try {
-      pedidos = await API.obterEmPreparo();
+      pedidos = await API.obterProducao(statusAtivo);
       renderizarPedidos();
-      atualizarStats();
+      await atualizarStats();
     } catch (err) {
       console.error('Erro ao carregar pedidos:', err);
+      gridPedidos.innerHTML = '<p class="placeholder">Erro ao carregar pedidos</p>';
     }
   }
 
   function renderizarPedidos() {
     if (!pedidos || pedidos.length === 0) {
-      gridPedidos.innerHTML = '<p class="placeholder">Nenhum pedido em preparo</p>';
+      gridPedidos.innerHTML = `<p class="placeholder">Nenhum pedido ${statusAtivo === 'em_preparo' ? 'em preparo' : 'pronto'} para cozinha</p>`;
       return;
     }
 
-    gridPedidos.innerHTML = pedidos.map(p => `
-      <div class="pedido-card" onclick="abrirPedido(${p.id})">
-        <div class="pedido-numero">#${p.numero_pedido}</div>
-        <div class="pedido-info">
-          <div class="pedido-status">${p.status}</div>
-          <div class="pedido-criado">${formatarData(p.created_at)}</div>
-        </div>
-        <div class="pedido-total">${formatarMoeda(p.total)}</div>
-      </div>
-    `).join('');
+    gridPedidos.innerHTML = pedidos
+      .map((p) => {
+        const itens = (p.itens || []).filter((i) => Number(i.produto_vai_cozinha) === 1);
+        const itensPreview = itens
+          .slice(0, 3)
+          .map((i) => `<div class="item-preview"><span class="item-nome">${i.produto_nome}</span> <span class="item-qty">x${i.quantidade}</span></div>`)
+          .join('');
+        return `<div class="pedido-card ${p.status}" data-id="${p.id}">
+          <div class="pedido-numero">${tituloComanda(p)}</div>
+          <div class="pedido-tempo">${calcularTempoEspera(p.created_at)}</div>
+          <div class="pedido-itens-count">${itens.length} item(ns) de cozinha</div>
+          <div class="pedido-itens-preview">${itensPreview || '<div class="item-preview">Sem itens</div>'}</div>
+          <div class="pedido-acoes">
+            ${p.status === 'em_preparo' ? '<button class="btn btn-success btn-small btn-pronto">Marcar pronto</button>' : '<span style="font-size:12px;color:#4CAF50;font-weight:bold">Pronto para entrega</span>'}
+          </div>
+        </div>`;
+      })
+      .join('');
+
+    gridPedidos.querySelectorAll('.pedido-card').forEach((card) => {
+      const id = Number(card.dataset.id);
+      card.addEventListener('click', () => abrirPedido(id));
+      const btnPronto = card.querySelector('.btn-pronto');
+      if (btnPronto) {
+        btnPronto.addEventListener('click', async (e) => {
+          e.stopPropagation();
+          await marcarPedidoPronto(id);
+        });
+      }
+    });
   }
 
-  window.abrirPedido = async function(id) {
+  async function abrirPedido(id) {
     try {
       const p = await API.obterVenda(id);
       pedidoAtivo = p;
-      tituloPedido.textContent = p.numero_pedido ? `Pedido #${p.numero_pedido}` : `Pedido`;
+      tituloPedido.textContent = `Comanda ${tituloComanda(p)}`;
       statusPedido.textContent = p.status;
+      statusPedido.className = `status-badge ${p.status}`;
       horarioPedido.textContent = formatarData(p.created_at);
       tempoEspera.textContent = calcularTempoEspera(p.created_at);
       observacoesPedido.textContent = p.observacoes || '--';
 
-      const itens = p.itens || [];
-      if (itens.length === 0) itensPedido.innerHTML = '<p class="placeholder">Nenhum item</p>';
-      else itensPedido.innerHTML = itens.map(i => `
-        <div class="item-pedido">
-          <div class="nome">${i.produto_nome}</div>
-          <div class="qtd">x${i.quantidade}</div>
-        </div>
-      `).join('');
+      const itensCozinha = (p.itens || []).filter((i) => Number(i.produto_vai_cozinha) === 1);
+      if (!itensCozinha.length) {
+        itensPedido.innerHTML = '<p class="placeholder">Nenhum item de cozinha</p>';
+      } else {
+        itensPedido.innerHTML = itensCozinha
+          .map(
+            (i) => `<div class="item-detalhe">
+              <div class="item-info">
+                <div class="item-titulo">${i.produto_nome}</div>
+                <div class="item-observacoes">${i.observacoes || ''}</div>
+              </div>
+              <div class="item-quantidade">x${i.quantidade}</div>
+            </div>`
+          )
+          .join('');
+      }
 
+      btnMarcarPronto.style.display = p.status === 'em_preparo' ? 'block' : 'none';
       modal.style.display = 'flex';
     } catch (err) {
       console.error('Erro ao abrir pedido:', err);
     }
-  };
+  }
 
-  btnMarcarPronto.addEventListener('click', async () => {
-    if (!pedidoAtivo) return;
+  async function marcarPedidoPronto(id) {
     try {
-      await API.marcarPronto(pedidoAtivo.id);
-      modal.style.display = 'none';
-      pedidoAtivo = null;
+      await API.marcarPronto(id);
+      if (pedidoAtivo && pedidoAtivo.id === id) {
+        modal.style.display = 'none';
+        pedidoAtivo = null;
+      }
       await carregarPedidos();
       showNotificacao('Pedido marcado como pronto');
     } catch (err) {
       console.error('Erro ao marcar pronto:', err);
+      alert(err.message || 'Erro ao marcar como pronto');
     }
-  });
+  }
 
-  btnFecharModal.addEventListener('click', () => modal.style.display = 'none');
-  btnCancelarDetalhes.addEventListener('click', () => modal.style.display = 'none');
-
-  btnRecarregar.addEventListener('click', () => carregarPedidos());
-
-  function atualizarStats() {
-    totalEmPreparo.textContent = pedidos.filter(p => p.status === 'em_preparo').length;
-    totalProntos.textContent = pedidos.filter(p => p.status === 'pronta').length;
+  async function atualizarStats() {
+    try {
+      const [emPreparo, prontos] = await Promise.all([API.obterProducao('em_preparo'), API.obterProducao('pronta')]);
+      totalEmPreparo.textContent = String(emPreparo.length);
+      totalProntos.textContent = String(prontos.length);
+    } catch (e) {
+      console.error('Erro ao atualizar stats', e);
+    }
   }
 
   function showNotificacao(msg) {
     console.log(`[INFO] ${msg}`);
   }
 
-  // Inicializar
-  carregarPedidos();
-  setInterval(() => carregarPedidos(), 5000);
+  async function refreshGeral() {
+    if (refreshRodando) return;
+    refreshRodando = true;
+    try {
+      const emPreparoAtual = await API.obterProducao('em_preparo');
+      const novos = emPreparoAtual.filter((p) => !idsEmPreparo.has(p.id));
+      idsEmPreparo = new Set(emPreparoAtual.map((p) => p.id));
+      if (novos.length > 0) {
+        tocarAlertaNovoPedido();
+      }
+      await carregarPedidos();
+      if (pedidoAtivo) {
+        try {
+          const updated = await API.obterVenda(pedidoAtivo.id);
+          pedidoAtivo = updated;
+          if (modal.style.display !== 'none') await abrirPedido(pedidoAtivo.id);
+        } catch {
+          modal.style.display = 'none';
+          pedidoAtivo = null;
+        }
+      }
+    } finally {
+      refreshRodando = false;
+    }
+  }
+
+  btnMarcarPronto.addEventListener('click', async () => {
+    if (!pedidoAtivo) return;
+    await marcarPedidoPronto(pedidoAtivo.id);
+  });
+
+  btnFecharModal.addEventListener('click', () => (modal.style.display = 'none'));
+  btnCancelarDetalhes.addEventListener('click', () => (modal.style.display = 'none'));
+  btnRecarregar.addEventListener('click', () => refreshGeral());
+
+  document.querySelectorAll('.aba').forEach((aba) => {
+    aba.addEventListener('click', async () => {
+      statusAtivo = aba.dataset.status;
+      document.querySelectorAll('.aba').forEach((a) => a.classList.remove('aba-ativa'));
+      aba.classList.add('aba-ativa');
+      await carregarPedidos();
+    });
+  });
+
+  refreshGeral();
+  setInterval(refreshGeral, 5000);
 });

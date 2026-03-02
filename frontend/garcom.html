@@ -17,8 +17,8 @@
 
         <div class="main-content">
             <div class="abas-filtro">
-                <button class="aba aba-ativa" data-status="aberta">
-                    Comanda <span class="badge" id="badgeAbertas">0</span>
+                <button class="aba aba-ativa" data-status="todas">
+                    Todas <span class="badge" id="badgeAbertas">0</span>
                 </button>
                 <button class="aba" data-status="em_preparo">
                     Preparando <span class="badge" id="badgePreparo">0</span>
@@ -53,10 +53,27 @@
             </div>
 
             <div class="produtos-section">
-                <h3>Adicionar Itens</h3>
-                <input type="text" id="buscaProdutoModal" class="search-input" placeholder="🔍 Buscar...">
-                <div id="gridProdutosModal" class="grid-produtos-modal">
-                    <p class="placeholder">Carregando produtos...</p>
+                <div style="display:flex;gap:8px;margin-bottom:10px">
+                    <button id="btnModoProdutos" class="btn" style="flex:1;padding:10px;font-size:12px">Produtos</button>
+                    <button id="btnModoAvulso" class="btn btn-secondary" style="flex:1;padding:10px;font-size:12px">Valor Avulso</button>
+                </div>
+
+                <div id="blocoProdutosModal">
+                    <h3>Adicionar Itens</h3>
+                    <input type="text" id="buscaProdutoModal" class="search-input" placeholder="🔍 Buscar...">
+                    <div id="gridProdutosModal" class="grid-produtos-modal">
+                        <p class="placeholder">Carregando produtos...</p>
+                    </div>
+                </div>
+
+                <div id="blocoAvulsoModal" style="display:none">
+                    <h3>Adicionar Valor Avulso</h3>
+                    <div id="displayAvulsoModal" class="display-value" style="font-size:22px;margin-bottom:10px">R$ 0,00</div>
+                    <div id="tecladoAvulsoModal" class="numeric-pad"></div>
+                    <div style="display:flex;gap:8px;margin-top:10px">
+                        <button id="btnClearAvulsoModal" class="pad-key secondary" style="flex:1;padding:10px;font-size:12px">Limpar</button>
+                        <button id="btnAddAvulsoModal" class="pad-key" style="flex:1;padding:10px;font-size:12px">Adicionar</button>
+                    </div>
                 </div>
             </div>
 

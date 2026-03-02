@@ -71,6 +71,7 @@ async function initializeDatabase() {
       estoque INTEGER NOT NULL DEFAULT 0,
       estoque_minimo INTEGER NOT NULL DEFAULT 0,
       tipo TEXT NOT NULL CHECK(tipo IN ('simples', 'composto')),
+      vai_cozinha BOOLEAN DEFAULT 0,
       ativo BOOLEAN DEFAULT 1,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -115,6 +116,16 @@ async function initializeDatabase() {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (produto_id) REFERENCES produtos(id) ON DELETE CASCADE,
       FOREIGN KEY (ingrediente_id) REFERENCES produtos(id)
+    )`,
+
+    // Histórico de transações (preparação fase 5)
+    `CREATE TABLE IF NOT EXISTS historico_transacoes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      tipo_entidade TEXT NOT NULL,
+      entidade_id INTEGER,
+      acao TEXT NOT NULL,
+      detalhes TEXT,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`
   ];
 
@@ -133,6 +144,9 @@ async function initializeDatabase() {
   cols = await dbAll("PRAGMA table_info(produtos)");
   if (!cols.some(c => c.name === 'imagem')) {
     await runQuery(database, 'ALTER TABLE produtos ADD COLUMN imagem TEXT');
+  }
+  if (!cols.some(c => c.name === 'vai_cozinha')) {
+    await runQuery(database, 'ALTER TABLE produtos ADD COLUMN vai_cozinha BOOLEAN DEFAULT 0');
   }
 
   // Inserir produtos de exemplo se a tabela estiver vazia
@@ -162,8 +176,15 @@ async function initializeDatabase() {
         try {
           await runQuery(
             database,
-            `INSERT INTO produtos (nome, preco, estoque, estoque_minimo, tipo, ativo) VALUES (?, ?, ?, ?, ?, 1)`,
-            [produto.nome, produto.preco, produto.estoque, produto.estoque_minimo, produto.tipo]
+            `INSERT INTO produtos (nome, preco, estoque, estoque_minimo, tipo, vai_cozinha, ativo) VALUES (?, ?, ?, ?, ?, ?, 1)`,
+            [
+              produto.nome,
+              produto.preco,
+              produto.estoque,
+              produto.estoque_minimo,
+              produto.tipo,
+              ['Hambúrguer', 'Pastel', 'Batata Frita', 'Comida Composição', 'Moqueca'].includes(produto.nome) ? 1 : 0
+            ]
           );
         } catch {
           // Produto já existe, ignorar
@@ -178,13 +199,28 @@ async function initializeDatabase() {
     console.warn('Aviso ao inserir produtos de exemplo:', error.message);
   }
 
+  // Atualizar produtos já existentes com padrão de cozinha para itens de preparo comum
+  try {
+    await runQuery(
+      database,
+      `UPDATE produtos 
+       SET vai_cozinha = 1 
+       WHERE nome IN ('Hambúrguer', 'Pastel', 'Batata Frita', 'Comida Composição', 'Moqueca')
+       AND (vai_cozinha IS NULL OR vai_cozinha = 0)`
+    );
+  } catch (error) {
+    console.warn('Aviso ao ajustar flag de cozinha:', error.message);
+  }
+
   // Criar índices
   const indexQueries = [
     'CREATE INDEX IF NOT EXISTS idx_vendas_tipo ON vendas(tipo)',
     'CREATE INDEX IF NOT EXISTS idx_vendas_status ON vendas(status)',
     'CREATE INDEX IF NOT EXISTS idx_vendas_created_at ON vendas(created_at)',
     'CREATE INDEX IF NOT EXISTS idx_venda_itens_venda_id ON venda_itens(venda_id)',
-    'CREATE INDEX IF NOT EXISTS idx_ficha_tecnica_produto_id ON ficha_tecnica(produto_id)'
+    'CREATE INDEX IF NOT EXISTS idx_ficha_tecnica_produto_id ON ficha_tecnica(produto_id)',
+    'CREATE INDEX IF NOT EXISTS idx_historico_entidade ON historico_transacoes(tipo_entidade, entidade_id)',
+    'CREATE INDEX IF NOT EXISTS idx_historico_created_at ON historico_transacoes(created_at)'
   ];
 
   for (const query of indexQueries) {

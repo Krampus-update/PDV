@@ -3,9 +3,17 @@ import { dbRun, dbGet, dbAll } from '../database/database.js';
 class ProdutoModel {
   static async criar(dados) {
     const result = await dbRun(
-      `INSERT INTO produtos (nome, preco, estoque, estoque_minimo, tipo, imagem) 
-       VALUES (?, ?, ?, ?, ?, ?)`,
-      [dados.nome, dados.preco, dados.estoque || 0, dados.estoque_minimo || 0, dados.tipo || 'simples', dados.imagem || null]
+      `INSERT INTO produtos (nome, preco, estoque, estoque_minimo, tipo, imagem, vai_cozinha) 
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        dados.nome,
+        dados.preco,
+        dados.estoque || 0,
+        dados.estoque_minimo || 0,
+        dados.tipo || 'simples',
+        dados.imagem || null,
+        dados.vai_cozinha ? 1 : 0
+      ]
     );
     return result.lastID;
   }
@@ -26,7 +34,7 @@ class ProdutoModel {
     const values = [];
 
     for (const [key, value] of Object.entries(dados)) {
-      if (['nome', 'preco', 'estoque', 'estoque_minimo', 'tipo', 'ativo', 'imagem'].includes(key)) {
+      if (['nome', 'preco', 'estoque', 'estoque_minimo', 'tipo', 'ativo', 'imagem', 'vai_cozinha'].includes(key)) {
         fields.push(`${key} = ?`);
         values.push(value);
       }
