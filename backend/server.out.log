@@ -1,0 +1,14 @@
+
+> pdv-system-backend@1.0.0 start
+> node server.js
+
+✓ Banco de dados inicializado com sucesso
+
+===================================
+🚀 PDV System - Backend iniciado
+===================================
+📡 Servidor rodando em http://localhost:3000
+🌐 Acessível via rede: http://<seu-ip>:3000
+📊 API de status: http://localhost:3000/api/status
+===================================
+

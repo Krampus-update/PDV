@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PDV - Acesso</title>
+  <style>
+    :root {
+      --bg-a: #0f172a;
+      --bg-b: #1e293b;
+      --card: #ffffff;
+      --admin: #1d4ed8;
+      --cliente: #047857;
+      --text: #0f172a;
+      --muted: #64748b;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      min-height: 100vh;
+      font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+      background: radial-gradient(circle at 15% 20%, #334155 0%, var(--bg-a) 45%, var(--bg-b) 100%);
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 16px;
+    }
+
+    .wrap {
+      width: min(960px, 100%);
+      display: grid;
+      gap: 18px;
+    }
+
+    .hero {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      border-radius: 16px;
+      padding: 22px;
+      color: #e2e8f0;
+      backdrop-filter: blur(2px);
+    }
+
+    .hero h1 {
+      font-size: 28px;
+      margin-bottom: 8px;
+    }
+
+    .hero p {
+      color: #cbd5e1;
+      font-size: 14px;
+    }
+
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(220px, 1fr));
+      gap: 16px;
+    }
+
+    .card {
+      background: var(--card);
+      border-radius: 16px;
+      padding: 20px;
+      box-shadow: 0 12px 28px rgba(2, 6, 23, 0.2);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .card h2 {
+      font-size: 20px;
+    }
+
+    .card p {
+      color: var(--muted);
+      font-size: 13px;
+      min-height: 38px;
+    }
+
+    .btn {
+      border: none;
+      border-radius: 10px;
+      color: white;
+      font-weight: 700;
+      padding: 11px 14px;
+      cursor: pointer;
+      transition: transform 0.15s ease, filter 0.15s ease;
+    }
+
+    .btn:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.05);
+    }
+
+    .btn-admin {
+      background: var(--admin);
+    }
+
+    .btn-cliente {
+      background: var(--cliente);
+    }
+
+    .remember {
+      margin-top: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #e2e8f0;
+      font-size: 13px;
+    }
+
+    @media (max-width: 760px) {
+      .hero h1 {
+        font-size: 24px;
+      }
+
+      .cards {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <section class="hero">
+      <h1>Sistema PDV</h1>
+      <p>Selecione o perfil para abrir o ambiente correto.</p>
+      <label class="remember">
+        <input id="lembrarAcesso" type="checkbox" checked>
+        Lembrar meu perfil neste dispositivo
+      </label>
+    </section>
+
+    <section class="cards">
+      <article class="card">
+        <h2>Admin</h2>
+        <p>Abre o ambiente técnico/administrativo com foco em gestão e suporte.</p>
+        <button id="btnAdmin" class="btn btn-admin">Entrar no Admin</button>
+      </article>
+
+      <article class="card">
+        <h2>Cliente</h2>
+        <p>Abre o painel operacional usado no atendimento diário.</p>
+        <button id="btnCliente" class="btn btn-cliente">Entrar no Painel</button>
+      </article>
+    </section>
+  </main>
+
+  <script src="js/acesso.js"></script>
+</body>
+</html>

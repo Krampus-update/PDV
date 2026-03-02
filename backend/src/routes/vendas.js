@@ -1,0 +1,39 @@
+import express from 'express';
+import VendaController from '../controllers/VendaController.js';
+
+const router = express.Router();
+
+// Criar nova venda
+router.post('/', VendaController.criar);
+
+// Obter todas as vendas com filtros
+router.get('/', VendaController.obterTodas);
+
+// Obter vendas abertas
+router.get('/abertas', VendaController.obterAbertas);
+
+// Obter pedidos em preparo (fastfood)
+router.get('/preparacao/em-preparo', VendaController.obterEmPreparo);
+
+// Obter venda específica
+router.get('/:id', VendaController.obterPorId);
+
+// Adicionar item à venda
+router.post('/:id/itens', VendaController.adicionarItem);
+
+// Atualizar quantidade de item
+router.put('/:id/itens/:item_id', VendaController.atualizarItem);
+
+// Remover item da venda
+router.delete('/:id/itens/:item_id', VendaController.removerItem);
+
+// Atualizar status da venda
+router.put('/:id/status', VendaController.atualizarStatus);
+
+// Marcar pedido como pronto
+router.put('/:id/marcar-pronto', VendaController.marcarPronto);
+
+// Fechar venda
+router.put('/:id/fechar', VendaController.fechar);
+
+export default router;

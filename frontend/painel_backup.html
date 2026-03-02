@@ -1,0 +1,573 @@
+<!DOCTYPE html>
+<html lang="pt-BR" style="height:100%">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>PDV - Painel</title>
+  <link rel="stylesheet" href="css/global.css">
+  <style>
+    :root{--accent:#0047ab}
+    body{background:#f5f5f5}
+    .container{padding:16px}
+    
+    /* Tabs */
+    .tabs{display:flex;gap:8px;padding:12px;background:#fff;border-bottom:1px solid #eee}
+    .tab{padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:600;color:#666;transition:all 0.2s}
+    .tab:hover{background:#f5f5f5}
+    .tab.active{background:var(--primary);color:#fff}
+    
+    .hidden{display:none!important}
+    .tab-content{height:calc(100vh - 60px);overflow:hidden}
+    
+    /* Específico aba Principal */
+    #home .main-content{
+      padding: 0;
+    }
+    
+    #home .main-content > div:first-child {
+      padding: 12px;
+      flex: 1;
+    }
+    
+    .products-main {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 12px;
+    }
+    
+    /* Específico aba Produtos */
+    #produtos .product-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    
+    /* Específico aba Mesas */
+    #mesas .mesas-list {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    
+    #mesas .mesas-list-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 12px;
+      background: #f9f9f9;
+      border-radius: 6px;
+      border: 1px solid #f0f0f0;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    #mesas .mesas-list-item:hover {
+      background: #f0f0f0;
+      border-color: var(--primary);
+    }
+    
+    #mesas .mesas-list-item strong {
+      font-size: 14px;
+      color: var(--dark-gray);
+    }
+    
+    #mesas .mesas-list-item .mesa-value {
+      color: var(--success);
+      font-weight: bold;
+      font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <div class="tabs">
+    <div class="tab active" data-target="home">🏠 Principal</div>
+    <div class="tab" data-target="produtos">🛍️ Produtos</div>
+    <div class="tab" data-target="mesas">🍽️ Mesas</div>
+    <div class="tab" data-target="config">⚙️ Configurações</div>
+  </div>
+
+  <div class="container">
+    <!-- ABA PRINCIPAL -->
+    <section id="home" class="tab-content">
+      <div class="two-column-layout">
+        <div class="main-content">
+          <div>
+            <h2>Catálogo de Produtos</h2>
+            <div id="produtosGrid" class="products-main"></div>
+          </div>
+        </div>
+
+        <div class="sidebar" id="sidePrincipal">
+          <div class="sidebar-section">
+            <h3>Comanda</h3>
+            <div style="margin-bottom:8px;">
+              <label style="font-size:12px;color:#666">Mesa:</label>
+              <input type="text" id="mesa" placeholder="Ex: 1, A, VIP" style="font-size:12px;padding:8px" />
+            </div>
+            <div class="cart-section" id="carrinhoItens">
+              <p style="color:#666;margin:0;font-size:12px">Clique em um produto para adicionar</p>
+            </div>
+            <div style="font-size:12px;margin-bottom:8px">
+              Total: <span id="carrinhoTotal" style="color:var(--success);font-weight:bold">R$ 0,00</span>
+            </div>
+            <button id="btnFinalizarVenda" class="btn btn-primary btn-block">Abrir Comanda</button>
+          </div>
+          
+          <hr style="margin:12px 0;border:none;border-top:1px solid #eee" />
+          
+          <div class="sidebar-section">
+            <h3>Valores Avulsos</h3>
+            <div id="displayValor" class="display-value">R$ 0,00</div>
+            <div id="teclado" class="numeric-pad"></div>
+            <div style="display:flex;gap:8px">
+              <button id="btnClear" class="pad-key secondary" style="flex:1;padding:10px">Limpar</button>
+              <button id="btnAddValor" class="pad-key" style="flex:1;padding:10px">Adicionar</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ABA PRODUTOS -->
+    <section id="produtos" class="tab-content hidden">
+      <div class="two-column-layout">
+        <div class="main-content">
+          <h2>Cadastro de Cardápio</h2>
+          <div class="main-content-scroll">
+            <div id="prodList" class="product-list"></div>
+          </div>
+        </div>
+
+        <div class="sidebar" id="sideProdutos">
+          <div class="sidebar-section">
+            <h3>Novo Produto</h3>
+            <input type="text" id="novoProdutoNome" placeholder="Nome" style="font-size:12px;padding:8px;margin-bottom:8px" />
+            <input type="number" id="novoProdutoPreco" placeholder="Preço" step="0.01" style="font-size:12px;padding:8px;margin-bottom:8px" />
+            <input type="number" id="novoProdutoEstoque" placeholder="Estoque" value="0" style="font-size:12px;padding:8px;margin-bottom:8px" />
+            <label style="font-size:12px;margin-bottom:4px;display:block;color:#666">Imagem (opcional)</label>
+            <input type="file" id="novoProdutoImagem" accept="image/*" style="font-size:11px;margin-bottom:6px" />
+            <img id="previewImagem" style="max-width:100%;max-height:80px;display:none;margin-bottom:6px;border-radius:4px" />
+            <button id="btnCriarProduto" class="btn btn-primary btn-block" style="font-size:12px;padding:10px">Criar Produto</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ABA MESAS -->
+    <section id="mesas" class="tab-content hidden">
+      <div class="two-column-layout">
+        <div class="main-content">
+          <h2>Mesas Abertas</h2>
+          <div class="main-content-scroll">
+            <div id="listaMesas" class="mesas-list"></div>
+          </div>
+        </div>
+
+        <div class="sidebar" id="sideMesas">
+          <p style="color:#999;font-size:12px">Selecione uma mesa à esquerda</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ABA CONFIGURAÇÕES -->
+    <section id="config" class="tab-content hidden">
+      <div class="two-column-layout" style="grid-template-columns:1fr">
+        <div class="main-content">
+          <h2>Configurações</h2>
+          <div class="main-content-scroll">
+            <form class="item-form" id="configForm" style="max-width:400px">
+              <div style="margin-bottom:12px">
+                <label style="display:block;margin-bottom:6px;font-weight:600;font-size:12px">Nome do estabelecimento</label>
+                <input type="text" id="nomeEstabelecimento" style="font-size:12px;padding:8px" />
+              </div>
+              <div style="margin-bottom:12px">
+                <label style="display:block;margin-bottom:6px;font-weight:600;font-size:12px">Modo de operação</label>
+                <select id="modoOperacao" style="font-size:12px;padding:8px">
+                  <option value="bar">Bar</option>
+                  <option value="fastfood">Fast Food</option>
+                  <option value="hibrido">Híbrido</option>
+                </select>
+              </div>
+              <div style="margin-bottom:12px">
+                <label style="display:block;margin-bottom:6px;font-weight:600;font-size:12px">Cor de destaque</label>
+                <input type="color" id="corDestaque" value="#0047ab" />
+              </div>
+              <button type="button" id="salvarConfig" class="btn btn-primary btn-block" style="font-size:12px;padding:10px">Salvar</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script>
+        <div style="margin-bottom:8px">
+          <label>Cor de destaque</label><br>
+          <input type="color" id="corDestaque" value="#0047ab" />
+        </div>
+        <div style="margin-top:12px">
+          <button type="button" id="salvarConfig">Salvar</button>
+        </div>
+      </form>
+    </section>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script>
+    // ----- Helper functions -----
+    function formatarMoedaBR(v){
+      const n = Number(v||0);
+      return n.toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+    }
+
+    function converterBufferParaValor(buffer){
+      if(!buffer) return 0;
+      let v = buffer.replace(',', '.');
+      if(v.includes('.')){
+        const n = parseFloat(v);
+        return isNaN(n) ? null : n;
+      }
+      // sem ponto: interpretar como centavos
+      let reais = 0, centavos = v;
+      if(centavos.length > 2){
+        reais = parseInt(centavos.slice(0,-2));
+        centavos = centavos.slice(-2);
+      } else {
+        centavos = centavos.padStart(2,'0');
+      }
+      const n = reais + parseInt(centavos)/100;
+      return isNaN(n) ? null : n;
+    }
+
+    function criarTeclado(container, display, options={}){
+      // options.maxDigits, options.smallKeys
+      const max = options.maxDigits || 6;
+      const teclas = ['7','8','9','4','5','6','1','2','3','0',','];
+      let buffer = '';
+      const update = ()=>{ display.textContent = formatarMoedaBR(converterBufferParaValor(buffer)||0); };
+      teclas.forEach(k=>{
+        const btn = document.createElement('div');
+        btn.className = 'tecla' + (k === ',' ? ' secondary' : '');
+        if(options.smallKeys){ btn.style.fontSize='14px'; btn.style.padding='8px'; }
+        btn.textContent = k;
+        btn.addEventListener('click', ()=>{
+          if(k === ','){
+            if(buffer.includes(',')) return;
+            buffer += k;
+          } else {
+            if(buffer.length < max) buffer += k;
+          }
+          update();
+        });
+        container.appendChild(btn);
+      });
+      return {
+        clear(){ buffer=''; update(); },
+        getValue(){ return converterBufferParaValor(buffer); },
+        setValue(v){ buffer = String(v); update(); }
+      };
+    }
+
+    // ----- Tab navigation -----
+    document.querySelectorAll('.tab').forEach(t=>t.addEventListener('click',switchTab));
+    function switchTab(e){
+      document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+      e.currentTarget.classList.add('active');
+      document.querySelectorAll('.tab-content').forEach(c=>c.classList.add('hidden'));
+      const target = e.currentTarget.dataset.target;
+      document.getElementById(target).classList.remove('hidden');
+      if(target==='mesas') carregarMesas();
+    }
+
+    // ----- Configuração -----
+    function loadConfig(){
+      const cfg = JSON.parse(localStorage.getItem('pdv_config')||'{}');
+      const modo = cfg.modo||'bar';
+      const mesaEl = document.getElementById('mesaSelector');
+      mesaEl.style.display = modo==='bar' ? 'block' : 'none';
+      document.documentElement.style.setProperty('--accent', cfg.cor||'#0047ab');
+    }
+    document.getElementById('salvarConfig').addEventListener('click',()=>{
+      const cfg={nome:document.getElementById('nomeEstabelecimento').value,
+                 modo:document.getElementById('modoOperacao').value,
+                 cor:document.getElementById('corDestaque').value};
+      localStorage.setItem('pdv_config',JSON.stringify(cfg));
+      loadConfig();
+      alert('Configurações salvas');
+    });
+    loadConfig();
+
+    // ----- Estado global -----
+    let carrinho=[];
+    let nextAvulsoId=1;
+    let currentMesa=null;
+    let vendaAtual=null;
+
+    // ----- Painel principal -----
+    const mainTeclado = criarTeclado(document.getElementById('teclado'),document.getElementById('displayValor'));
+    document.getElementById('btnClear').addEventListener('click',()=>mainTeclado.clear());
+    document.getElementById('btnAddValor').addEventListener('click',()=>{
+      const valor = mainTeclado.getValue();
+      if(valor===null||valor<=0) return alert('Digite um valor válido');
+      adicionarAoCarrinho({produto_id:'avulso',nome:`Avulso R$ ${valor.toFixed(2)}`,preco:valor});
+      mainTeclado.clear();
+      alert('Adicionado ao carrinho');
+    });
+    document.getElementById('btnFinalizarVenda').addEventListener('click',abrirComanda);
+
+    function abrirComanda(){
+      if(carrinho.length===0){ alert('Carrinho vazio'); return; }
+      const mesa = document.getElementById('mesa').value || 'balcao';
+      (async()=>{
+        try{
+          const venda=await API.criarVenda('bar',mesa);
+          vendaAtual=venda.id; localStorage.setItem('vendaAtual',vendaAtual);
+          for(const it of carrinho){
+            if(String(it.produto_id).startsWith('avulso')){
+              // produto temporário precisa de nome único para não chocar com índice UNIQUE
+            const temp=await API.criarProduto({nome:`${it.nome} #${Date.now()}`,preco:it.preco,estoque:9999,estoque_minimo:0});
+              const pid=temp.id||temp.lastID;
+              await API.adicionarItem(venda.id,pid,1);
+            } else {
+              await API.adicionarItem(venda.id,it.produto_id,it.quantidade);
+            }
+          }
+          carrinho=[]; atualizarCarrinhoUI(); document.getElementById('mesa').value='';
+          // mudar para aba mesas
+          document.querySelector('[data-target="mesas"]').click();
+          alert('Comanda aberta. Mesa em seu nome.');
+        }catch(e){console.error(e);alert('Erro ao abrir comanda: '+(e.message||e));}
+      })();
+    }
+
+    function adicionarAoCarrinho(prod){
+      if(prod.produto_id==='avulso'){
+        carrinho.push({...prod,produto_id:`avulso-${nextAvulsoId++}`,quantidade:1,subtotal:prod.preco});
+      } else {
+        const ex=carrinho.find(i=>i.produto_id==prod.produto_id);
+        if(ex){ ex.quantidade++; ex.subtotal=ex.quantidade*ex.preco; }
+        else{ carrinho.push({...prod,quantidade:1,subtotal:prod.preco}); }
+      }
+      atualizarCarrinhoUI();
+    }
+    function atualizarCarrinhoUI(){
+      const el=document.getElementById('carrinhoItens');
+      if(carrinho.length===0) el.innerHTML='<p style="color:#666">Carrinho vazio</p>';
+      else el.innerHTML=carrinho.map(i=>`<div style="display:flex;justify-content:space-between"><span>${i.nome} x${i.quantidade}</span><span>${formatarMoedaBR(i.subtotal)}</span></div>`).join('');
+      document.getElementById('carrinhoTotal').textContent=formatarMoedaBR(carrinho.reduce((s,i)=>s+i.subtotal,0));
+    }
+
+    // ----- Mesas -----
+    let mesaTeclado = null;
+    
+    async function carregarMesas(){
+      try{
+        const vendas = await API.obterVendas({tipo:'bar',status:'aberta'});
+        const el=document.getElementById('listaMesas');
+        if(!vendas||vendas.length===0){ el.innerHTML='<p style="padding:8px">Nenhuma mesa aberta</p>'; return; }
+        el.innerHTML=vendas.map(v=>`<div class="prod-item" data-id="${v.id}" style="cursor:pointer;padding:12px;background:#f9f9f9;margin-bottom:4px;border-radius:4px;display:flex;justify-content:space-between;align-items:center"><span><strong>Mesa ${v.mesa||'S/N'}</strong></span><span style="color:#0a7">${formatarMoedaBR(v.total||0)}</span></div>`).join('');
+        el.querySelectorAll('.prod-item').forEach(d=>d.addEventListener('click',()=>abrirMesa(d.dataset.id)));
+      }catch(err){console.error('Erro ao carregar mesas',err);alert('Erro ao carregar mesas');}
+    }
+    
+    async function abrirMesa(id){
+      try{
+        const venda=await API.obterVenda(id);
+        currentMesa=venda;
+        renderSideMesa(venda);
+      }catch(err){console.error(err);alert('Erro ao abrir mesa');}
+    }
+    
+    function renderSideMesa(venda){
+      const sideEl = document.getElementById('sideMesas');
+      const itens = venda.itens||[];
+      const produtos = [];
+      
+      // Carregar lista de produtos para adicionar
+      API.obterProdutos().then(prods=>{
+        const filtered=prods.filter(p=>p.tipo!=='avulso');
+        let prodHtml='';
+        if(filtered.length>0){
+          prodHtml = '<h4>Adicionar Produto</h4><div style="display:grid;grid-template-columns:1fr;gap:4px">';
+          prodHtml += filtered.map(p=>`<button class="prod-btn" data-id="${p.id}" data-nome="${p.nome}" data-preco="${p.preco}" style="padding:8px;background:#f0f0f0;border:none;border-radius:4px;cursor:pointer;text-align:left;font-size:12px"><strong>${p.nome}</strong> - ${formatarMoedaBR(p.preco)}</button>`).join('');
+          prodHtml += '</div>';
+        }
+        
+        sideEl.innerHTML = `
+          <h3>Mesa ${venda.mesa||'S/N'}</h3>
+          <div style="margin-bottom:8px"><strong>Total:</strong> ${formatarMoedaBR(venda.total||0)}</div>
+          
+          <h4>Itens da Comanda</h4>
+          <div style="max-height:100px;overflow:auto;background:#f9f9f9;padding:8px;border-radius:4px;margin-bottom:8px;">
+            ${itens.length===0?'<p style="color:#666">Sem itens</p>':itens.map(i=>`<div style="display:flex;justify-content:space-between;padding:4px;border-bottom:1px solid #eee;font-size:12px"><span>${i.produto_nome} <span style="color:#666">x${i.quantidade}</span></span><span style="color:#0a7">${formatarMoedaBR(i.subtotal)}</span></div>`).join('')}
+          </div>
+          
+          ${prodHtml}
+          
+          <hr style="margin:12px 0" />
+          
+          <h4>Valor Avulso</h4>
+          <div id="sideMesaDisplay" class="display" style="font-size:20px;margin-bottom:8px">R$ 0,00</div>
+          <div id="sideMesaTeclado" class="teclado" style="margin-bottom:8px;grid-template-columns:repeat(3,1fr);gap:6px"></div>
+          <div style="display:flex;gap:4px;flex-direction:column;margin-bottom:12px">
+            <button id="btnSideMesaClear" style="padding:8px;background:#eee;border:none;border-radius:4px;cursor:pointer;font-size:12px">Limpar</button>
+            <button id="btnSideMesaAddValor" style="padding:8px;background:#0047ab;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px">Adicionar Valor</button>
+          </div>
+          
+          <button id="btnSideMesaFechar" style="width:100%;padding:10px;background:#0a7;color:#fff;border:none;border-radius:4px;cursor:pointer;font-weight:bold">Fechar Comanda</button>
+        `;
+        
+        // Criar novo teclado para este side
+        if(mesaTeclado) mesaTeclado.container.innerHTML='';
+        mesaTeclado = criarTeclado(document.getElementById('sideMesaTeclado'), document.getElementById('sideMesaDisplay'));
+        
+        // Botões do teclado
+        document.getElementById('btnSideMesaClear').addEventListener('click',()=>mesaTeclado.clear());
+        document.getElementById('btnSideMesaAddValor').addEventListener('click',async()=>{
+          const valor=mesaTeclado.getValue();
+          if(valor===null||valor<=0) return alert('Valor inválido');
+          if(!currentMesa) return alert('Nenhuma mesa selecionada');
+          try{
+            const temp=await API.criarProduto({nome:`Avulso R$ ${valor.toFixed(2)} #${Date.now()}`,preco:valor,estoque:9999,estoque_minimo:0});
+            const pid=temp.id||temp.lastID;
+            await API.adicionarItem(currentMesa.id,pid,1);
+            const upd=await API.obterVenda(currentMesa.id);
+            currentMesa=upd;
+            renderSideMesa(upd);
+            mesaTeclado.clear();
+            alert('Valor adicionado');
+          }catch(e){console.error(e);alert('Erro ao adicionar valor');}
+        });
+        
+        // Botões de produto
+        sideEl.querySelectorAll('.prod-btn').forEach(btn=>{
+          btn.addEventListener('click',async()=>{
+            const pid=btn.dataset.id;
+            if(!currentMesa) return;
+            try{
+              await API.adicionarItem(currentMesa.id,pid,1);
+              const updated=await API.obterVenda(currentMesa.id);
+              currentMesa=updated;
+              renderSideMesa(updated);
+            }catch(er){console.error(er);}        
+          });
+        });
+        
+        // Fechar comanda
+        document.getElementById('btnSideMesaFechar').addEventListener('click',async()=>{
+          if(!currentMesa) return;
+          if(!confirm('Fechar comanda?')) return;
+          try{
+            await API.fecharVenda(currentMesa.id,'dinheiro');
+            document.getElementById('sideMesas').innerHTML='<p style="color:#999">Selecione uma mesa à esquerda</p>';
+            currentMesa=null; vendaAtual=null; localStorage.removeItem('vendaAtual');
+            await carregarMesas();
+            alert('Comanda fechada');
+          }catch(e){console.error(e);alert('Erro ao fechar comanda');}
+        });
+      }).catch(e=>console.error('Erro ao carregar produtos:',e));
+    }
+
+    // lista produtos e CRUD
+    function renderProdutosGrid(produtos){
+      const el=document.getElementById('produtosGrid');
+      const filtered=produtos.filter(p=>p.tipo!=='avulso');
+      el.innerHTML=filtered.map(p=>`<div class="produto-card" data-id="${p.id}" data-nome="${p.nome}" data-preco="${p.preco}">
+        <div class="produto-img">${p.imagem?`<img src="${p.imagem}" style="width:100%;height:100%;object-fit:cover;border-radius:6px"/>`:'IMG'}</div>
+        <div class="produto-nome">${p.nome}</div>
+        <div class="produto-preco">${formatarMoedaBR(p.preco)}</div>
+        <div class="produto-estoque">${p.estoque} em estoque</div>
+      </div>`).join('');
+      el.querySelectorAll('.produto-card').forEach(card=>{
+        card.addEventListener('click',()=>{
+          adicionarAoCarrinho({produto_id:card.dataset.id,nome:card.dataset.nome,preco:parseFloat(card.dataset.preco)});
+        });
+      });
+    }
+    function renderProdutosList(produtos){
+      const el=document.getElementById('prodList');
+      const filtered=produtos.filter(p=>p.tipo!=='avulso');
+      el.innerHTML=filtered.map(p=>`<div class="prod-item" style="display:flex;justify-content:space-between;align-items:center"><div><strong>#${p.id} ${p.nome}</strong><div style="font-size:12px;color:#666">${p.tipo} • código: ${p.id}</div></div><div style="text-align:right"><div>${p.estoque} un</div><div style="color:#0a7">${formatarMoedaBR(p.preco)}</div><button onclick="deletarProduto(${p.id})" style="font-size:12px;padding:2px 6px;cursor:pointer;">X</button></div></div>`).join('');
+    }
+
+    // preview de imagem e leitura como base64
+    let produtoImagemBase64 = null;
+    document.getElementById('novoProdutoImagem').addEventListener('change', (ev)=>{
+      const file = ev.target.files[0];
+      const preview = document.getElementById('previewImagem');
+      if(file){
+        // limitar tamanho de imagem: máx 5MB
+        if(file.size > 5 * 1024 * 1024){
+          alert('Arquivo muito grande (máx 5MB)');
+          ev.target.value = '';
+          preview.style.display = 'none';
+          produtoImagemBase64 = null;
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = () => {
+          produtoImagemBase64 = reader.result;
+          preview.src = reader.result;
+          preview.style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+      } else {
+        produtoImagemBase64 = null;
+        preview.src = '';
+        preview.style.display = 'none';
+      }
+    });
+
+    async function carregarProdutosCompleto(){
+      try{ const produtos = await API.obterProdutos(); renderProdutosGrid(produtos); renderProdutosList(produtos); }
+      catch(e){ console.error('Erro ao carregar produtos:', e); }
+    }
+
+    let criacaoProdutoEmProgresso = false;
+    document.getElementById('btnCriarProduto').addEventListener('click',async()=>{
+      if(criacaoProdutoEmProgresso){
+        alert('Criando produto, aguarde...');
+        return;
+      }
+      const nome = document.getElementById('novoProdutoNome').value || '';
+      const preco = parseFloat(document.getElementById('novoProdutoPreco').value);
+      const estoque = parseInt(document.getElementById('novoProdutoEstoque').value) || 0;
+      if(!nome.trim() || isNaN(preco)){
+        alert('Preencha nome e preço');return;
+      }
+      if(preco <= 0){
+        alert('Preço deve ser maior que zero');return;
+      }
+      criacaoProdutoEmProgresso = true;
+      const btnRef = document.getElementById('btnCriarProduto');
+      btnRef.disabled = true;
+      btnRef.textContent = 'Criando...';
+      try{
+        console.log('Criar produto:', {nome, preco, estoque, imagem: produtoImagemBase64 ? 'sim' : 'não'});
+        const resp = await API.criarProduto({nome, preco, estoque, estoque_minimo: 0, tipo: 'simples', imagem: produtoImagemBase64});
+        console.log('Resposta servidor:', resp);
+        document.getElementById('novoProdutoNome').value = '';
+        document.getElementById('novoProdutoPreco').value = '';
+        document.getElementById('novoProdutoEstoque').value = '0';
+        document.getElementById('novoProdutoImagem').value = '';
+        document.getElementById('previewImagem').style.display = 'none';
+        produtoImagemBase64 = null;
+        await carregarProdutosCompleto();
+        alert('Produto criado com sucesso!');
+      }catch(e){
+        console.error('Erro ao criar produto:', e);
+        alert('Erro: ' + (e.message || e));
+      } finally {
+        criacaoProdutoEmProgresso = false;
+        btnRef.disabled = false;
+        btnRef.textContent = 'Criar Produto';
+      }
+    });
+    window.deletarProduto=async(id)=>{if(!confirm('Deletar produto?'))return;try{await API.deletarProduto(id);await carregarProdutosCompleto();}catch(e){alert('Erro ao deletar');}};
+
+    // inicialização
+    carregarProdutosCompleto(); setInterval(()=>carregarMesas(),5000);
+  </script>
+</body>
+</html>

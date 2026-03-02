@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDV - Caixa</title>
+    <link rel="stylesheet" href="css/pdv.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="header-left">
+                <h1>🏪 PDV - Caixa</h1>
+                <p id="relogio" class="relogio">--:--</p>
+            </div>
+            <div class="header-right">
+                <span id="conexao" class="status online">● Online</span>
+            </div>
+        </header>
+
+        <div class="main-content">
+            <!-- Painel Esquerdo: Lista de Vendas -->
+            <aside class="sidebar">
+                <div class="sidebar-header">
+                    <h2>Vendas Abertas</h2>
+                    <button id="novaVendaBtn" class="btn btn-primary btn-block">+ Nova Venda</button>
+                </div>
+                <div id="listaVendas" class="lista-vendas">
+                    <p class="placeholder">Nenhuma venda aberta</p>
+                </div>
+            </aside>
+
+            <!-- Painel Central: Adicionar Produtos -->
+            <section class="produtos-section">
+                <div class="produtos-header">
+                    <input type="text" id="buscaProduto" class="search-input" placeholder="🔍 Buscar produto...">
+                    <select id="filtroTipo" class="filter-select">
+                        <option value="">Todos os Produtos</option>
+                        <option value="bar">Bar</option>
+                        <option value="fastfood">Fast Food</option>
+                    </select>
+                </div>
+                <div id="gridProdutos" class="grid-produtos">
+                    <p class="placeholder">Carregando produtos...</p>
+                </div>
+            </section>
+
+            <!-- Painel Direito: Detalhes da Venda -->
+            <aside class="carrinho">
+                <div class="carrinho-header">
+                    <h2>Comanda <span id="numeroComanda">--</span></h2>
+                    <span id="statusVenda" class="status-badge aberta">aberta</span>
+                </div>
+
+                <div id="itensCarrinho" class="itens-carrinho">
+                    <p class="placeholder">Selecione uma venda</p>
+                </div>
+
+                <div class="carrinho-rodape">
+                    <div class="total-info">
+                        <span>Subtotal:</span>
+                        <span id="subtotal" class="valor">R$ 0,00</span>
+                    </div>
+                    <div class="total-info total">
+                        <span>TOTAL:</span>
+                        <span id="totalVenda" class="valor">R$ 0,00</span>
+                    </div>
+
+                    <div class="acoes-carrinho">
+                        <button id="fecharVendaBtn" class="btn btn-success" disabled>Fechar Venda</button>
+                        <button id="cancelarVendaBtn" class="btn btn-danger" disabled>Cancelar</button>
+                    </div>
+                </div>
+            </aside>
+        </div>
+    </div>
+
+    <!-- Modal de Fechamento -->
+    <div id="modalFechamento" class="modal" style="display: none;">
+        <div class="modal-content modal-pagamento">
+            <h3>Forma de Pagamento</h3>
+            <div class="form-group">
+                <label>Selecione a forma de pagamento:</label>
+                <select id="formaPagamento" class="input-field">
+                    <option value="">-- Selecione --</option>
+                    <option value="dinheiro">💵 Dinheiro</option>
+                    <option value="credito">💳 Crédito</option>
+                    <option value="debito">💳 Débito</option>
+                    <option value="pix">📱 PIX</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Observações (opcional):</label>
+                <textarea id="observacoesPagamento" class="input-field" placeholder="Ex: Cliente pediu desconto..."></textarea>
+            </div>
+            <div class="modal-acoes">
+                <button id="btnConfirmarPagamento" class="btn btn-success">Confirmar Pagamento</button>
+                <button id="btnCancelarPagamento" class="btn btn-secondary">Voltar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Nova Venda -->
+    <div id="modalNovaVenda" class="modal" style="display: none;">
+        <div class="modal-content">
+            <h3>Nova Venda</h3>
+            <div class="form-group">
+                <label>Tipo de Estabelecimento:</label>
+                <div class="radio-group">
+                    <label class="radio-label">
+                        <input type="radio" name="tipoVenda" value="bar" checked> Bar
+                    </label>
+                    <label class="radio-label">
+                        <input type="radio" name="tipoVenda" value="fastfood"> Fast Food
+                    </label>
+                </div>
+            </div>
+            <div class="modal-acoes">
+                <button id="btnCriarVenda" class="btn btn-primary">Criar Venda</button>
+                <button id="btnCancelarNovaVenda" class="btn btn-secondary">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/api.js"></script>
+    <script src="js/pdv.js"></script>
+</body>
+</html>

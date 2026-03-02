@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Garçom - PDV</title>
+    <link rel="stylesheet" href="css/garcom.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header" style="position:relative;padding-bottom:24px">
+            <h1>🍽️ Garçom</h1>
+            <span id="conexao" class="status online">● Online</span>
+        </header>
+
+        <button id="btnNovaComanda" class="btn-floating">+</button>
+
+        <div class="main-content">
+            <div class="abas-filtro">
+                <button class="aba aba-ativa" data-status="aberta">
+                    Comanda <span class="badge" id="badgeAbertas">0</span>
+                </button>
+                <button class="aba" data-status="em_preparo">
+                    Preparando <span class="badge" id="badgePreparo">0</span>
+                </button>
+                <button class="aba" data-status="pronta">
+                    Pronta <span class="badge" id="badgePronta">0</span>
+                </button>
+            </div>
+
+            <div id="listaVendas" class="lista-vendas">
+                <p class="placeholder">Carregando comandas...</p>
+            </div>
+        </div>
+    </div>
+
+    <div id="modalDetalhes" class="modal" style="display: none;">
+        <div class="modal-content modal-comanda">
+            <div class="modal-header">
+                <h2 id="tituloComanda">Comanda #--</h2>
+                <button class="btn-fechar" id="btnFecharModal">&times;</button>
+            </div>
+
+            <div class="info-comanda">
+                <p><strong>Status:</strong> <span id="statusComanda" class="status-badge"></span></p>
+                <p><strong>Total:</strong> <span id="totalComanda" class="valor">R$ 0,00</span></p>
+            </div>
+
+            <div class="produtos-comanda">
+                <h3>Itens da Comanda</h3>
+                <div id="itensComanda" class="itens grid-items">
+                </div>
+            </div>
+
+            <div class="produtos-section">
+                <h3>Adicionar Itens</h3>
+                <input type="text" id="buscaProdutoModal" class="search-input" placeholder="🔍 Buscar...">
+                <div id="gridProdutosModal" class="grid-produtos-modal">
+                    <p class="placeholder">Carregando produtos...</p>
+                </div>
+            </div>
+
+            <div class="modal-acoes">
+                <button id="btnRemoverUltimo" class="btn btn-warning">← Remover Último</button>
+                <button id="btnFecharComanda" class="btn btn-success">Finalizar</button>
+                <button id="btnCancelarComanda" class="btn btn-secondary">Voltar</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="modalAjustarQtd" class="modal" style="display: none;">
+        <div class="modal-content modal-ajustar" style="position:fixed;bottom:0;left:0;right:0;width:100%;max-width:100%;border-radius:12px 12px 0 0;max-height:60vh;display:flex;flex-direction:column;justify-content:space-between">
+            <div style="padding:20px;text-align:center;border-bottom:1px solid #eee">
+                <p id="produtoNomeQtd" style="font-size:16px;font-weight:bold;margin-bottom:8px"></p>
+                <p id="produtoInfoQtd" style="font-size:13px;color:#666;margin:0"></p>
+            </div>
+
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px 20px;gap:20px">
+                <button id="btnQtdMais" style="width:100%;padding:20px;font-size:24px;font-weight:bold;background:var(--success);color:white;border:none;border-radius:8px;cursor:pointer">+</button>
+                <div id="qtdDisplay" style="font-size:48px;font-weight:bold;color:var(--primary);min-width:80px;text-align:center">0</div>
+                <button id="btnQtdMenos" style="width:100%;padding:20px;font-size:24px;font-weight:bold;background:var(--warning);color:white;border:none;border-radius:8px;cursor:pointer">−</button>
+            </div>
+
+            <div style="padding:20px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px;border-top:1px solid #eee">
+                <button id="btnCancelarQtd" style="padding:15px;background:#ddd;border:none;border-radius:6px;cursor:pointer;font-weight:bold">Cancelar</button>
+                <button id="btnSalvarQtd" style="padding:15px;background:var(--primary);color:white;border:none;border-radius:6px;cursor:pointer;font-weight:bold">Salvar</button>
+                <button id="btnRemoverItemQtd" style="padding:15px;background:var(--danger);color:white;border:none;border-radius:6px;cursor:pointer;font-weight:bold">Remover</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/api.js"></script>
+    <script src="js/common.js"></script>
+    <script src="js/garcom.js"></script>
+</body>
+</html>

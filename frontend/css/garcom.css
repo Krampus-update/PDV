@@ -1,0 +1,494 @@
+@import url('global.css');
+
+/* Garçom - Mobile Layout */
+.container {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.main-content {
+    flex: 1;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+
+/* Abas de Filtro */
+.abas-filtro {
+    display: flex;
+    gap: 0;
+    padding: 0;
+    background: white;
+    border-bottom: 3px solid var(--light-gray);
+    box-shadow: var(--shadow);
+}
+
+.aba {
+    flex: 1;
+    padding: 15px;
+    border: none;
+    background: white;
+    color: #999;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s;
+    font-size: 14px;
+    border-bottom: 3px solid transparent;
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.aba:hover {
+    background: var(--light-gray);
+}
+
+.aba.aba-ativa {
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+}
+
+.badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--danger);
+    color: white;
+    border-radius: 50%;
+    width: 24px;
+    height: 24px;
+    font-size: 11px;
+    font-weight: bold;
+}
+
+/* Lista de Vendas */
+.lista-vendas {
+    flex: 1;
+    overflow-y: auto;
+    padding: 15px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.venda-card {
+    background: white;
+    border-radius: 10px;
+    padding: 20px;
+    cursor: pointer;
+    transition: all 0.3s;
+    border-left: 5px solid transparent;
+    box-shadow: var(--shadow);
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 15px;
+}
+
+.venda-card:hover {
+    transform: translateY(-5px);
+    box-shadow: var(--shadow-lg);
+}
+
+.venda-card.aberta {
+    border-left-color: #2196F3;
+}
+
+.venda-card.aberta:hover {
+    background: #f0f7ff;
+}
+
+.venda-card.em_preparo {
+    border-left-color: #ff9800;
+}
+
+.venda-card.em_preparo:hover {
+    background: #fff3e0;
+}
+
+.venda-card.pronta {
+    border-left-color: #4CAF50;
+}
+
+.venda-card.pronta:hover {
+    background: #f1f8e9;
+}
+
+.venda-info {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.venda-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+
+.venda-numero {
+    font-size: 24px;
+    font-weight: bold;
+    color: var(--primary);
+}
+
+.venda-tipo {
+    font-size: 12px;
+    text-transform: uppercase;
+    color: #999;
+    font-weight: bold;
+}
+
+.venda-status {
+    display: inline-block;
+    margin-bottom: 8px;
+}
+
+.venda-itens-preview {
+    font-size: 13px;
+    color: #666;
+    margin-bottom: 8px;
+}
+
+.venda-itens-preview strong {
+    color: var(--dark-gray);
+}
+
+.venda-total {
+    font-size: 18px;
+    font-weight: bold;
+    color: var(--success);
+    text-align: right;
+}
+
+.venda-horario {
+    font-size: 12px;
+    color: #999;
+    text-align: right;
+}
+
+/* botão flutuante nova comanda */
+.btn-floating {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: var(--primary);
+    color: white;
+    font-size: 28px;
+    border: none;
+    cursor: pointer;
+    box-shadow: var(--shadow-lg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* Modal da Comanda */
+.modal-content {
+    width: 95%;
+    max-width: 95vw;
+    height: 95vh;
+    max-height: 95vh;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+/* grid de itens da comanda */
+.grid-items, #itensComanda {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+    gap: 8px;
+}
+.grid-items .item {
+    background: linear-gradient(135deg, #f9f9f9, #f0f0f0);
+    padding: 12px;
+    border-radius: 6px;
+    border: 1px solid #eee;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    font-size: 12px;
+    transition: all 0.2s;
+}
+.grid-items .item:hover {
+    border-color: var(--primary);
+    box-shadow: var(--shadow);
+}
+.grid-items .item .nome {
+    font-weight: bold;
+    margin-bottom: 4px;
+    line-height: 1.2;
+}
+.grid-items .item .qtd {
+    color: #666;
+    font-size: 11px;
+    margin-bottom: 3px;
+}
+.grid-items .item .subtotal {
+    color: var(--success);
+    font-weight: bold;
+    font-size: 13px;
+}
+
+.modal-comanda .modal-header {
+    padding: 20px;
+    border-bottom: 2px solid var(--light-gray);
+}
+
+.modal-comanda .modal-header h2 {
+    margin: 0;
+}
+
+.modal-comanda .modal-header .btn-fechar {
+    position: absolute;
+    right: 15px;
+    top: 15px;
+}
+
+.info-comanda {
+    padding: 15px 20px;
+    background: var(--light-gray);
+    border-bottom: 1px solid var(--border-color);
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+}
+
+.info-comanda p {
+    margin: 0;
+    font-size: 14px;
+}
+
+.info-comanda strong {
+    display: block;
+    color: #999;
+    font-size: 12px;
+    margin-bottom: 4px;
+}
+
+/* Produtos da Comanda (Lista) */
+.produtos-comanda {
+    padding: 15px 20px;
+    border-bottom: 1px solid var(--border-color);
+    max-height: 120px;
+    overflow-y: auto;
+}
+
+.produtos-comanda h3 {
+    color: var(--primary);
+    font-size: 14px;
+    margin-bottom: 10px;
+}
+
+.itens {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.item-lista {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 13px;
+}
+
+.item-nome {
+    flex: 1;
+    color: var(--dark-gray);
+}
+
+.item-qty {
+    font-weight: bold;
+    color: var(--primary);
+    background: rgba(102, 126, 234, 0.1);
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin: 0 10px;
+    font-size: 12px;
+}
+
+.item-subtotal {
+    font-weight: bold;
+    color: var(--success);
+    font-size: 12px;
+}
+
+/* Grid de Produtos */
+.produtos-section {
+    flex: 1;
+    padding: 15px 20px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.produtos-section h3 {
+    color: var(--primary);
+    font-size: 14px;
+    margin-bottom: 10px;
+}
+
+.search-input {
+    margin-bottom: 10px;
+    padding: 10px;
+    font-size: 14px;
+}
+
+.grid-produtos-modal {
+    flex: 1;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+    overflow-y: auto;
+    padding-right: 10px;
+}
+
+.grid-produtos-modal::-webkit-scrollbar {
+    width: 6px;
+}
+
+.grid-produtos-modal {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 8px;
+}
+
+.grid-produtos-modal::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.grid-produtos-modal::-webkit-scrollbar-thumb {
+    background: #ddd;
+    border-radius: 3px;
+}
+
+.grid-produtos-modal .produto-card {
+    padding: 12px;
+    background: var(--light-gray);
+    border: 2px solid transparent;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+}
+
+.grid-produtos-modal .produto-card:hover {
+    border-color: var(--primary);
+}
+
+.grid-produtos-modal .produto-card.sem-estoque {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.grid-produtos-modal .produto-card.sem-estoque:hover {
+    border-color: transparent;
+}
+
+.grid-produtos-modal .produto-nome {
+    font-size: 12px;
+    font-weight: bold;
+    margin-bottom: 6px;
+}
+
+.grid-produtos-modal .produto-preco {
+    font-size: 14px;
+    font-weight: bold;
+    color: var(--primary);
+    margin-bottom: 6px;
+}
+
+
+/* Modal Ações */
+.modal-acoes {
+    display: flex;
+    gap: 8px;
+    padding: 15px 20px;
+    border-top: 2px solid var(--light-gray);
+    background: var(--light-gray);
+}
+
+.modal-acoes .btn {
+    flex: 1;
+    padding: 12px;
+    font-size: 12px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .venda-card {
+        grid-template-columns: 1fr;
+        padding: 15px;
+    }
+
+    .venda-total,
+    .venda-horario {
+        text-align: left;
+    }
+
+    .grid-produtos-modal {
+        grid-template-columns: repeat(3, 1fr);
+    }
+
+    .modal-content {
+        width: 100%;
+        height: 100vh;
+        max-width: 100vw;
+        max-height: 100vh;
+        border-radius: 0;
+    }
+}
+
+@media (max-width: 480px) {
+    .aba {
+        font-size: 12px;
+        padding: 12px;
+    }
+
+    .venda-card {
+        padding: 12px;
+    }
+
+    .venda-numero {
+        font-size: 18px;
+    }
+
+    .grid-produtos-modal {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 8px;
+    }
+
+    .modal-acoes .btn {
+        padding: 10px;
+        font-size: 11px;
+    }
+}
+
+/* Modal Ajustar Quantidade - Mobile Friendly */
+.modal-ajustar {
+    background: white;
+    z-index: 1000;
+}
+
+.modal-ajustar input[type="number"] {
+    font-size: 16px;
+}
+
+@media (max-width: 768px) {
+    .modal-ajustar {
+        max-height: 50vh !important;
+    }
+}
