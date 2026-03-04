@@ -6,214 +6,217 @@
   <title>PDV - Painel</title>
   <link rel="stylesheet" href="css/global.css">
   <style>
-    :root{--accent:#0047ab}
-    body{background:#f5f5f5;margin:0;height:100%}
-    .container{padding:16px;height:calc(100% - 68px)}
-    
-    /* Tabs */
-    .tabs{display:flex;gap:8px;padding:12px;background:#fff;border-bottom:1px solid #eee}
-    .tab{padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:600;color:#666;transition:all 0.2s}
-    .tab:hover{background:#f5f5f5}
-    .tab.active{background:var(--primary);color:#fff}
-    
-    .hidden{display:none!important}
-    .tab-content{height:100%;overflow:hidden}
-    
+    .hidden { display: none !important; }
+
+    .app-content {
+      height: calc(100vh - 72px);
+      overflow: hidden;
+    }
+
     .products-main {
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
       gap: 12px;
     }
-    
-    .product-list {
+    .products-main.grouped {
       display: flex;
       flex-direction: column;
-      gap: 4px;
+      gap: 16px;
     }
-    
+    .category-section {
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 10px;
+      background: #ffffff;
+    }
+    .category-title {
+      margin: 0 0 10px;
+      font-size: 13px;
+      font-weight: 700;
+      color: #0f172a;
+    }
+    .category-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 0 0 12px;
+      position: sticky;
+      top: 0;
+      z-index: 5;
+      background: #fff;
+      padding: 8px 0;
+      border-bottom: 1px solid #eef2f7;
+    }
+    .category-chip {
+      border: 1px solid #d1d5db;
+      background: #fff;
+      color: #334155;
+      border-radius: 999px;
+      padding: 6px 12px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .category-chip.active {
+      border-color: var(--primary);
+      background: #e8f2ff;
+      color: #1e3a8a;
+    }
+
+    .product-list { display: flex; flex-direction: column; gap: 4px; }
+
     .product-list-item {
       display: flex;
       justify-content: space-between;
       align-items: center;
       padding: 10px;
-      background: #f9f9f9;
-      border-radius: 6px;
-      border: 1px solid #f0f0f0;
+      background: #f8fafc;
+      border-radius: 8px;
+      border: 1px solid #e2e8f0;
       transition: all 0.2s;
     }
-    
-    .product-list-item:hover {
-      background: #f0f0f0;
-      border-color: var(--primary);
-    }
-    
-    .product-list-item-name {
-      flex: 1;
-      font-weight: 600;
-      font-size: 13px;
-    }
-    
+
+    .product-list-item:hover { border-color: var(--primary); }
+    .product-list-item.selected { background: #e8f2ff; border-color: var(--primary); }
+
+    .product-list-item-name { flex: 1; font-weight: 600; font-size: 13px; }
+
     .product-list-item-info {
       display: flex;
       align-items: center;
       gap: 12px;
       font-size: 12px;
     }
-    
-    .product-list-item-info .qty {
-      color: #999;
-    }
-    
-    .product-list-item-info .price {
-      color: var(--success);
-      font-weight: bold;
-      min-width: 50px;
-    }
-    
+
+    .product-list-item-info .qty { color: #64748b; }
+    .product-list-item-info .price { color: var(--success); font-weight: bold; min-width: 50px; }
+
     .product-list-item-info .delete-btn {
       background: var(--danger);
       color: white;
       border: none;
-      border-radius: 3px;
-      padding: 2px 6px;
+      border-radius: 4px;
+      padding: 4px 8px;
       cursor: pointer;
       font-size: 11px;
     }
 
-    /* highlight selecionado na lista */
-    .product-list-item.selected {
-      background: #e8f4ff;
-      border-color: var(--primary);
-    }
-    
-    .mesas-list {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-    
+    .mesas-list { display: flex; flex-direction: column; gap: 8px; }
+
     .mesas-list-item {
       display: flex;
       justify-content: space-between;
       align-items: center;
       padding: 12px;
-      background: #f9f9f9;
-      border-radius: 6px;
-      border: 1px solid #f0f0f0;
+      background: #f8fafc;
+      border-radius: 8px;
+      border: 1px solid #e2e8f0;
       cursor: pointer;
       transition: all 0.2s;
     }
-    
-    .mesas-list-item:hover {
-      background: #f0f0f0;
-      border-color: var(--primary);
-    }
-    
-    .mesas-list-item strong {
-      font-size: 14px;
-      color: var(--dark-gray);
-    }
-    
-    .mesas-list-item .mesa-value {
-      color: var(--success);
-      font-weight: bold;
-      font-size: 13px;
-    }
-    
+
+    .mesas-list-item:hover { border-color: var(--primary); }
+    .mesas-list-item strong { font-size: 14px; }
+    .mesas-list-item .mesa-value { color: var(--success); font-weight: bold; font-size: 13px; }
+
     .produtos-mesa-grid {
       display: grid;
-      grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
       gap: 8px;
       margin: 12px 0;
     }
-    
+
     .produto-mesa-card {
       background: white;
-      border: 1px solid #f0f0f0;
-      border-radius: 6px;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
       padding: 8px;
       text-align: center;
       cursor: pointer;
       transition: all 0.2s;
       font-size: 11px;
     }
-    
-    .produto-mesa-card:hover {
-      border-color: var(--primary);
-      box-shadow: var(--shadow);
-    }
-    
+
+    .produto-mesa-card:hover { border-color: var(--primary); box-shadow: var(--shadow); }
+
     .produto-mesa-card-img {
       width: 100%;
       height: 50px;
-      background: linear-gradient(135deg, #f0f0f0, #e8e8e8);
-      border-radius: 4px;
+      background: linear-gradient(135deg, #f1f5f9, #e2e8f0);
+      border-radius: 6px;
       display: flex;
       align-items: center;
       justify-content: center;
-      color: #999;
+      color: #94a3b8;
       font-size: 10px;
       margin-bottom: 4px;
     }
-    
-    .produto-mesa-card-name {
-      font-weight: 600;
-      line-height: 1.1;
-      margin-bottom: 2px;
-    }
-    
-    .produto-mesa-card-price {
-      color: var(--success);
-      font-weight: bold;
-    }
-    
+
+    .produto-mesa-card-name { font-weight: 600; line-height: 1.1; margin-bottom: 2px; }
+    .produto-mesa-card-price { color: var(--success); font-weight: bold; }
+
     .mesa-items-list {
-      background: #f9f9f9;
-      border-radius: 4px;
+      background: #f8fafc;
+      border-radius: 6px;
       padding: 8px;
-      max-height: 80px;
+      max-height: 110px;
       overflow-y: auto;
       margin: 8px 0;
       font-size: 12px;
     }
-    
-    .mesa-items-list::-webkit-scrollbar {
-      width: 4px;
-    }
-    
-    .mesa-items-list::-webkit-scrollbar-thumb {
-      background: #ccc;
-      border-radius: 2px;
-    }
-    
+
     .mesa-item {
       display: flex;
       justify-content: space-between;
       padding: 3px 0;
-      border-bottom: 1px solid #eee;
+      border-bottom: 1px solid #e2e8f0;
       font-size: 11px;
     }
-    
-    .mesa-item:last-child {
-      border-bottom: none;
-    }
+
+    .mesa-item:last-child { border-bottom: none; }
   </style>
 </head>
-<body>
-  <div class="tabs">
-    <div class="tab active" data-target="home">🏠 Principal</div>
-    <div class="tab" data-target="produtos">🛍️ Produtos</div>
-    <div class="tab" data-target="mesas">🍽️ Comandas</div>
-    <div class="tab" data-target="config">⚙️ Configurações</div>
-  </div>
+<body class="app-page">
+  <header class="app-topbar">
+    <div class="topbar-left">
+      <div class="topbar-logo">PDV</div>
+      <div class="topbar-brand">
+        <div class="name" id="topRestaurantName">Restaurante</div>
+        <div class="meta" id="topRestaurantMeta">Tenant</div>
+      </div>
+      <span id="conexao" class="status online">● Online</span>
+    </div>
 
-  <div class="container">
+    <nav class="topbar-center">
+      <button class="topbar-tab tab active" data-target="home">Principal</button>
+      <button class="topbar-tab tab" data-target="produtos">Estoque</button>
+      <button class="topbar-tab tab" data-target="mesas">Comandas</button>
+      <button class="topbar-tab tab" data-target="clientes">Clientes</button>
+    </nav>
+
+    <div class="topbar-right">
+      <div class="topbar-user-wrap">
+        <button id="topUserTrigger" class="topbar-user-trigger" type="button">
+          <div class="topbar-user">
+            <div class="user-avatar" id="topUserAvatar">US</div>
+            <div>
+              <div class="user-name" id="topUserName">Usuário</div>
+              <div class="meta" id="topUserRole"></div>
+            </div>
+          </div>
+        </button>
+        <div id="topUserMenu" class="user-menu hidden"></div>
+      </div>
+    </div>
+  </header>
+
+  <div class="app-content">
     <!-- ABA PRINCIPAL -->
     <section id="home" class="tab-content">
       <div class="two-column-layout">
         <div class="main-content">
           <h2>Catálogo de Produtos</h2>
           <div class="main-content-scroll">
+            <div id="homeCategorias" class="category-chips"></div>
             <div id="produtosGrid" class="products-main"></div>
           </div>
         </div>
@@ -233,9 +236,9 @@
             </div>
             <button id="btnFinalizarVenda" class="btn btn-primary btn-block" style="font-size:12px;padding:10px">Abrir Comanda</button>
           </div>
-          
+
           <hr style="margin:12px 0;border:none;border-top:1px solid #eee" />
-          
+
           <div class="sidebar-section">
             <h3>Valores Avulsos</h3>
             <div id="displayValor" class="display-value">R$ 0,00</div>
@@ -249,11 +252,11 @@
       </div>
     </section>
 
-    <!-- ABA PRODUTOS -->
+    <!-- ABA ESTOQUE -->
     <section id="produtos" class="tab-content hidden">
       <div class="two-column-layout">
         <div class="main-content">
-          <h2>Cadastro de Cardápio</h2>
+          <h2>Estoque e Cardápio</h2>
           <div class="main-content-scroll">
             <div id="prodList" class="product-list"></div>
           </div>
@@ -267,6 +270,18 @@
             <div id="displayPreco" class="display-value" style="font-size:16px;margin-bottom:8px">R$ 0,00</div>
             <div id="precoTeclado" class="numeric-pad" style="grid-template-columns:repeat(3,1fr);gap:4px;margin-bottom:8px"></div>
             <input type="number" id="novoProdutoEstoque" placeholder="Estoque" value="0" style="font-size:12px;padding:8px;margin-bottom:8px;width:100%" />
+            <label style="font-size:12px;margin-bottom:4px;display:block;color:#666">Categoria</label>
+            <input list="categoriasList" type="text" id="novoProdutoCategoria" placeholder="Ex: bebidas, comidas, sobremesas" style="font-size:12px;padding:8px;margin-bottom:8px;width:100%" />
+            <datalist id="categoriasList"></datalist>
+            <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#666;margin-bottom:8px">
+              <input type="checkbox" id="novoProdutoDestaque" style="width:auto">
+              Destacar no cardápio (promoção)
+            </label>
+            <label style="font-size:12px;margin-bottom:4px;display:block;color:#666">Popularidade (ordem)</label>
+            <input type="number" id="novoProdutoPopularidade" placeholder="0" value="0" style="font-size:12px;padding:8px;margin-bottom:8px;width:100%" />
+            <label style="font-size:12px;margin-bottom:4px;display:block;color:#666">Variações de tamanho</label>
+            <div id="variacoesList" class="variacao-list"></div>
+            <button id="btnAddVariacao" type="button" class="btn btn-secondary btn-block" style="font-size:12px;padding:8px;margin-bottom:8px">+ Adicionar variação</button>
             <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#666;margin-bottom:8px">
               <input type="checkbox" id="novoProdutoVaiCozinha" style="width:auto">
               Enviar para cozinha (produção)
@@ -287,6 +302,15 @@
         <div class="main-content">
           <h2>Comandas Abertas</h2>
           <div class="main-content-scroll">
+            <div style="display:grid;grid-template-columns:1fr 150px;gap:8px;margin-bottom:10px">
+              <input type="text" id="buscaComanda" placeholder="Buscar por mesa, balcão ou ID" style="font-size:12px;padding:8px">
+              <select id="filtroStatusComanda" style="font-size:12px;padding:8px">
+                <option value="todas">Todos status</option>
+                <option value="aberta">Aberta</option>
+                <option value="em_preparo">Em preparo</option>
+                <option value="pronta">Pronta</option>
+              </select>
+            </div>
             <div id="listaMesas" class="mesas-list"></div>
           </div>
         </div>
@@ -297,39 +321,35 @@
       </div>
     </section>
 
-    <!-- ABA CONFIGURAÇÕES -->
-    <section id="config" class="tab-content hidden">
-      <div class="two-column-layout" style="grid-template-columns:1fr">
+    <section id="clientes" class="tab-content hidden">
+      <div class="two-column-layout">
         <div class="main-content">
-          <h2>Configurações</h2>
-          <div style="padding:12px;overflow-y:auto">
-            <form class="item-form" id="configForm" style="max-width:400px">
-              <div style="margin-bottom:12px">
-                <label style="display:block;margin-bottom:6px;font-weight:600;font-size:12px">Nome do estabelecimento</label>
-                <input type="text" id="nomeEstabelecimento" style="font-size:12px;padding:8px;width:100%" />
-              </div>
-              <div style="margin-bottom:12px">
-                <label style="display:block;margin-bottom:6px;font-weight:600;font-size:12px">Modo de operação</label>
-                <select id="modoOperacao" style="font-size:12px;padding:8px;width:100%">
-                  <option value="bar">Bar</option>
-                  <option value="fastfood">Fast Food</option>
-                  <option value="hibrido">Híbrido</option>
-                </select>
-              </div>
-              <div style="margin-bottom:12px">
-                <label style="display:block;margin-bottom:6px;font-weight:600;font-size:12px">Cor de destaque</label>
-                <input type="color" id="corDestaque" value="#0047ab" />
-              </div>
-              <button type="button" id="salvarConfig" class="btn btn-primary btn-block" style="font-size:12px;padding:10px">Salvar</button>
-            </form>
+          <h2>Clientes</h2>
+          <div class="main-content-scroll">
+            <input type="text" id="buscaCliente" placeholder="Buscar por nome/telefone" style="margin-bottom:10px;">
+            <div id="listaClientes" class="product-list"></div>
+          </div>
+        </div>
+        <div class="sidebar" id="sideClientes">
+          <div class="sidebar-section">
+            <h3 id="tituloClienteForm">Novo Cliente</h3>
+            <input type="text" id="clienteNome" placeholder="Nome" style="font-size:12px;padding:8px;margin-bottom:8px;width:100%" />
+            <input type="text" id="clienteTelefone" placeholder="Telefone" style="font-size:12px;padding:8px;margin-bottom:8px;width:100%" />
+            <input type="number" id="clientePontos" placeholder="Pontos" value="0" style="font-size:12px;padding:8px;margin-bottom:8px;width:100%" />
+            <textarea id="clienteObs" placeholder="Observações" style="font-size:12px;padding:8px;margin-bottom:8px;width:100%;min-height:80px"></textarea>
+            <button id="btnSalvarCliente" class="btn btn-primary btn-block" style="font-size:12px;padding:10px">Salvar Cliente</button>
+            <button id="btnCancelarCliente" class="btn secondary btn-block" style="font-size:12px;padding:10px;display:none;margin-top:8px">Cancelar</button>
           </div>
         </div>
       </div>
     </section>
+
   </div>
 
   <script src="js/api.js"></script>
+  <script src="js/auth-guard.js"></script>
   <script src="js/common.js"></script>
+  <script src="js/config-modal.js"></script>
   <script src="js/painel.js"></script>
 </body>
 </html>

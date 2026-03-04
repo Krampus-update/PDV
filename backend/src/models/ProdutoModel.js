@@ -3,14 +3,18 @@ import { dbRun, dbGet, dbAll } from '../database/database.js';
 class ProdutoModel {
   static async criar(dados) {
     const result = await dbRun(
-      `INSERT INTO produtos (nome, preco, estoque, estoque_minimo, tipo, imagem, vai_cozinha) 
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO produtos (nome, preco, estoque, estoque_minimo, tipo, categoria, destaque, popularidade, opcoes_json, imagem, vai_cozinha) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         dados.nome,
         dados.preco,
         dados.estoque || 0,
         dados.estoque_minimo || 0,
         dados.tipo || 'simples',
+        dados.categoria || 'geral',
+        dados.destaque ? 1 : 0,
+        dados.popularidade || 0,
+        dados.opcoes_json || null,
         dados.imagem || null,
         dados.vai_cozinha ? 1 : 0
       ]
@@ -23,10 +27,11 @@ class ProdutoModel {
   }
 
   static async obterTodos(ativo = true) {
+    const order = ' ORDER BY destaque DESC, popularidade DESC, nome ASC';
     if (ativo) {
-      return dbAll('SELECT * FROM produtos WHERE ativo = 1 ORDER BY nome');
+      return dbAll(`SELECT * FROM produtos WHERE ativo = 1${order}`);
     }
-    return dbAll('SELECT * FROM produtos ORDER BY nome');
+    return dbAll(`SELECT * FROM produtos${order}`);
   }
 
   static async atualizar(id, dados) {
@@ -34,7 +39,7 @@ class ProdutoModel {
     const values = [];
 
     for (const [key, value] of Object.entries(dados)) {
-      if (['nome', 'preco', 'estoque', 'estoque_minimo', 'tipo', 'ativo', 'imagem', 'vai_cozinha'].includes(key)) {
+      if (['nome', 'preco', 'estoque', 'estoque_minimo', 'tipo', 'categoria', 'destaque', 'popularidade', 'opcoes_json', 'ativo', 'imagem', 'vai_cozinha'].includes(key)) {
         fields.push(`${key} = ?`);
         values.push(value);
       }

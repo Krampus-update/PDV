@@ -1,7 +1,9 @@
 import express from 'express';
 import VendaController from '../controllers/VendaController.js';
+import { authOptional, authRequired } from '../middlewares/auth.js';
 
 const router = express.Router();
+router.use(authOptional, authRequired);
 
 // Criar nova venda
 router.post('/', VendaController.criar);

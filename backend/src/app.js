@@ -3,6 +3,7 @@ import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import apiRoutes from './routes/index.js';
+import { tenantMiddleware } from './middlewares/tenant.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -17,7 +18,7 @@ app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 // Rotas da API
-app.use('/api', apiRoutes);
+app.use('/api', tenantMiddleware, apiRoutes);
 
 // Tratamento de rotas não encontradas
 app.use((req, res) => {
@@ -27,8 +28,8 @@ app.use((req, res) => {
 // Tratamento de erros
 app.use((err, req, res, next) => {
   console.error('Erro:', err);
-  res.status(err.status || 500).json({ 
-    error: err.message || 'Erro interno do servidor' 
+  res.status(err.status || 500).json({
+    error: err.message || 'Erro interno do servidor'
   });
 });
 

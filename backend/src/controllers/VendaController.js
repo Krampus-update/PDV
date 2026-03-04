@@ -2,6 +2,11 @@ import VendaModel from '../models/VendaModel.js';
 import VendaItemModel from '../models/VendaItemModel.js';
 import ProdutoModel from '../models/ProdutoModel.js';
 import HistoricoModel from '../models/HistoricoModel.js';
+import { broadcast } from '../services/realtimeService.js';
+import {
+  obterConfiguracao as obterConfigImpressao,
+  imprimirVenda as imprimirVendaTermica
+} from '../services/thermalPrinterService.js';
 
 // considera produto avulso qualquer item com nome iniciando por "Avulso" ou
 // com estoque muito alto (marca temporários gerados para venda avulsa).
@@ -22,6 +27,19 @@ async function registrarHistorico(acao, entidade_id, detalhes = null) {
   }
 }
 
+async function tentarImpressaoAutomatica({ vendaId, tipo, flag }) {
+  try {
+    const cfg = await obterConfigImpressao();
+    if (!cfg?.habilitada || !cfg?.[flag]) return;
+    const venda = await VendaModel.obterPorId(vendaId);
+    if (!venda) return;
+    const itens = await VendaItemModel.obterPorVenda(vendaId);
+    await imprimirVendaTermica(venda, itens, tipo);
+  } catch (e) {
+    console.warn(`Falha na impressão automática (${flag}):`, e.message);
+  }
+}
+
 class VendaController {
   static async criar(req, res) {
     try {
@@ -39,6 +57,7 @@ class VendaController {
 
       res.status(201).json(venda);
       await registrarHistorico('venda_criada', venda.id, { tipo, mesa: mesa || null });
+      broadcast('venda.criada', venda);
     } catch (error) {
       console.error('Erro ao criar venda:', error);
       res.status(500).json({ error: error.message });
@@ -107,7 +126,7 @@ class VendaController {
   static async adicionarItem(req, res) {
     try {
       const { id } = req.params;
-      const { produto_id, quantidade } = req.body;
+      const { produto_id, quantidade, observacoes, preco_unitario_override } = req.body;
 
       if (!produto_id || !quantidade) {
         return res.status(400).json({ error: 'produto_id e quantidade são obrigatórios' });
@@ -138,25 +157,49 @@ class VendaController {
         }
       }
 
-      // se já existir item com mesmo produto na venda, apenas atualiza a quantidade
+      const qtd = parseInt(quantidade, 10);
+      if (!qtd || qtd < 1) {
+        return res.status(400).json({ error: 'Quantidade inválida' });
+      }
+
+      const obsNorm = String(observacoes || '').trim() || null;
+      const override = Number.parseFloat(preco_unitario_override);
+      const precoUnitario = Number.isFinite(override) && override > 0 ? override : Number(produto.preco);
+
+      // se já existir item equivalente (mesmo produto, mesmo preço e mesma observação), apenas atualiza a quantidade
       const itensVenda = await VendaItemModel.obterPorVenda(id);
-      const existente = itensVenda.find(i => String(i.produto_id) === String(produto_id));
+      const existente = itensVenda.find(
+        (i) =>
+          String(i.produto_id) === String(produto_id) &&
+          Number(i.preco_unitario) === Number(precoUnitario) &&
+          String(i.observacoes || '').trim() === String(obsNorm || '').trim()
+      );
       if(existente){
-        const novaQtd = existente.quantidade + quantidade;
+        const novaQtd = existente.quantidade + qtd;
         const novoSubtotal = existente.preco_unitario * novaQtd;
         await VendaItemModel.atualizar(existente.id, { quantidade: novaQtd, subtotal: novoSubtotal });
         if(!avulso){
-          await ProdutoModel.atualizarEstoque(produto_id, -quantidade);
+          await ProdutoModel.atualizarEstoque(produto_id, -qtd);
         }
         await VendaModel.obterTotal(id);
         if (Number(produto.vai_cozinha) === 1 && ['aberta', 'pronta'].includes(venda.status)) {
           await VendaModel.atualizar(id, { status: 'em_preparo' });
+          broadcast('venda.status', { id: parseInt(id, 10), status: 'em_preparo' });
         }
         await registrarHistorico('item_quantidade_incrementada', parseInt(id, 10), {
           item_id: existente.id,
           produto_id,
-          quantidade_adicionada: quantidade
+          quantidade_adicionada: qtd,
+          observacoes: obsNorm
         });
+        broadcast('venda.item', { venda_id: parseInt(id, 10), produto_id, acao: 'incrementado' });
+        if (Number(produto.vai_cozinha) === 1) {
+          await tentarImpressaoAutomatica({
+            vendaId: parseInt(id, 10),
+            tipo: 'cozinha',
+            flag: 'auto_cozinha_item'
+          });
+        }
         return res.status(200).json({
           message: 'Quantidade de item atualizada',
           item_id: existente.id,
@@ -165,28 +208,38 @@ class VendaController {
       }
 
       // Calcular subtotal para novo item
-      const subtotal = produto.preco * quantidade;
+      const subtotal = precoUnitario * qtd;
 
       // Adicionar item novo
       const itemId = await VendaItemModel.criar({
         venda_id: id,
         produto_id,
-        quantidade,
-        preco_unitario: produto.preco,
-        subtotal
+        quantidade: qtd,
+        preco_unitario: precoUnitario,
+        subtotal,
+        observacoes: obsNorm
       });
 
       // Baixar estoque apenas se não tratar-se de avulso
       if(!avulso){
-        await ProdutoModel.atualizarEstoque(produto_id, -quantidade);
+        await ProdutoModel.atualizarEstoque(produto_id, -qtd);
       }
 
       // Atualizar total da venda
       await VendaModel.obterTotal(id);
       if (Number(produto.vai_cozinha) === 1 && ['aberta', 'pronta'].includes(venda.status)) {
         await VendaModel.atualizar(id, { status: 'em_preparo' });
+        broadcast('venda.status', { id: parseInt(id, 10), status: 'em_preparo' });
       }
-      await registrarHistorico('item_adicionado', parseInt(id, 10), { item_id: itemId, produto_id, quantidade });
+      await registrarHistorico('item_adicionado', parseInt(id, 10), { item_id: itemId, produto_id, quantidade: qtd, observacoes: obsNorm, preco_unitario: precoUnitario });
+      broadcast('venda.item', { venda_id: parseInt(id, 10), produto_id, item_id: itemId, acao: 'adicionado' });
+      if (Number(produto.vai_cozinha) === 1) {
+        await tentarImpressaoAutomatica({
+          vendaId: parseInt(id, 10),
+          tipo: 'cozinha',
+          flag: 'auto_cozinha_item'
+        });
+      }
 
       res.status(201).json({
         message: 'Item adicionado com sucesso',
@@ -221,6 +274,7 @@ class VendaController {
         produto_id: item.produto_id,
         quantidade: item.quantidade
       });
+      broadcast('venda.item', { venda_id: parseInt(id, 10), item_id: parseInt(item_id, 10), acao: 'removido' });
 
       res.json({ message: 'Item removido com sucesso' });
     } catch (error) {
@@ -276,11 +330,20 @@ class VendaController {
       await VendaModel.obterTotal(id);
       if (Number(produto.vai_cozinha) === 1 && ['aberta', 'pronta'].includes(venda.status)) {
         await VendaModel.atualizar(id, { status: 'em_preparo' });
+        broadcast('venda.status', { id: parseInt(id, 10), status: 'em_preparo' });
       }
       await registrarHistorico('item_atualizado', parseInt(id, 10), {
         item_id: parseInt(item_id, 10),
         quantidade
       });
+      broadcast('venda.item', { venda_id: parseInt(id, 10), item_id: parseInt(item_id, 10), acao: 'atualizado' });
+      if (Number(produto.vai_cozinha) === 1) {
+        await tentarImpressaoAutomatica({
+          vendaId: parseInt(id, 10),
+          tipo: 'cozinha',
+          flag: 'auto_cozinha_item'
+        });
+      }
 
       res.json({ message: 'Item atualizado com sucesso', quantidade, subtotal: novoSubtotal });
     } catch (error) {
@@ -308,6 +371,12 @@ class VendaController {
         forma_pagamento
       });
       await registrarHistorico('venda_fechada', parseInt(id, 10), { forma_pagamento });
+      broadcast('venda.status', { id: parseInt(id, 10), status: 'fechada' });
+      await tentarImpressaoAutomatica({
+        vendaId: parseInt(id, 10),
+        tipo: 'balcao',
+        flag: 'auto_fechamento'
+      });
 
       res.json({ message: 'Venda fechada com sucesso' });
     } catch (error) {
@@ -327,6 +396,7 @@ class VendaController {
 
       await VendaModel.atualizar(id, { status: 'pronta' });
       await registrarHistorico('venda_marcada_pronta', parseInt(id, 10), null);
+      broadcast('venda.status', { id: parseInt(id, 10), status: 'pronta' });
 
       res.json({ message: 'Pedido marcado como pronto' });
     } catch (error) {
@@ -351,6 +421,7 @@ class VendaController {
 
       await VendaModel.atualizar(id, { status });
       await registrarHistorico('status_atualizado', parseInt(id, 10), { status });
+      broadcast('venda.status', { id: parseInt(id, 10), status });
 
       res.json({ message: 'Status atualizado com sucesso' });
     } catch (error) {

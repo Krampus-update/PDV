@@ -2,9 +2,12 @@
 
 document.addEventListener('DOMContentLoaded', () => {
   const listaVendasEl = document.getElementById('listaVendas');
+  const mainContentEl = document.querySelector('.main-content');
   const badgeAbertas = document.getElementById('badgeAbertas');
   const badgePreparo = document.getElementById('badgePreparo');
   const badgePronta = document.getElementById('badgePronta');
+  const statusCurrentLabel = document.getElementById('statusCurrentLabel');
+  const statusCurrentDot = document.getElementById('statusCurrentDot');
 
   const modal = document.getElementById('modalDetalhes');
   const btnFecharModal = document.getElementById('btnFecharModal');
@@ -13,6 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const totalComanda = document.getElementById('totalComanda');
   const itensComanda = document.getElementById('itensComanda');
   const gridProdutosModal = document.getElementById('gridProdutosModal');
+  const chipsCategoriaModal = document.getElementById('chipsCategoriaModal');
   const buscaProdutoModal = document.getElementById('buscaProdutoModal');
   const btnRemoverUltimo = document.getElementById('btnRemoverUltimo');
   const btnFecharComanda = document.getElementById('btnFecharComanda');
@@ -41,7 +45,21 @@ document.addEventListener('DOMContentLoaded', () => {
   let itemEmEdicao = null;
   let quantidadeTemp = 0;
   let statusAtivo = 'todas';
+  let categoriaAtiva = 'todas';
   let refreshEmAndamento = false;
+  const statusOrder = ['todas', 'em_preparo', 'pronta'];
+
+  function statusLabel(status) {
+    if (status === 'em_preparo') return 'Preparando';
+    if (status === 'pronta') return 'Pronta';
+    return 'Todas';
+  }
+
+  function statusColor(status) {
+    if (status === 'em_preparo') return '#f59e0b';
+    if (status === 'pronta') return '#22c55e';
+    return '#3b82f6';
+  }
 
   const tecladoAvulso = criarTeclado(
     document.getElementById('tecladoAvulsoModal'),
@@ -63,6 +81,50 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log(`[${tipo.toUpperCase()}] ${msg}`);
   }
 
+  function normalizarCategoria(v) {
+    const s = String(v || '').trim().toLowerCase();
+    return s || 'geral';
+  }
+
+  function rotuloCategoria(v) {
+    const c = normalizarCategoria(v);
+    return c.charAt(0).toUpperCase() + c.slice(1);
+  }
+
+  function parseOpcoesProduto(prod) {
+    try {
+      const arr = JSON.parse(prod?.opcoes_json || '[]');
+      if (!Array.isArray(arr)) return [];
+      return arr
+        .map((o) => ({ nome: String(o?.nome || '').trim(), extra: Number(o?.extra || 0) || 0 }))
+        .filter((o) => o.nome);
+    } catch {
+      return [];
+    }
+  }
+
+  function opcoesParaTexto(opcoes) {
+    return opcoes.map((o, idx) => `${idx + 1}) ${o.nome} (${o.extra >= 0 ? '+' : ''}${formatarMoeda(o.extra)})`).join('\n');
+  }
+
+  function escolherOpcaoProduto(prod) {
+    const opcoes = parseOpcoesProduto(prod);
+    if (!opcoes.length) return { observacoes: null, preco: Number(prod.preco || 0) };
+    const msg = `Escolha a variação de ${prod.nome}:\n${opcoesParaTexto(opcoes)}\n\nDigite o número da opção:`;
+    const resp = prompt(msg, '1');
+    if (resp === null) return null;
+    const idx = parseInt(String(resp).trim(), 10) - 1;
+    if (idx < 0 || idx >= opcoes.length) {
+      alert('Opção inválida');
+      return null;
+    }
+    const sel = opcoes[idx];
+    return {
+      observacoes: sel.nome,
+      preco: Number(prod.preco || 0) + Number(sel.extra || 0)
+    };
+  }
+
   function aplicarModoModal(modo) {
     const produtosAtivo = modo === 'produtos';
     if (blocoProdutosModal) blocoProdutosModal.style.display = produtosAtivo ? 'block' : 'none';
@@ -74,30 +136,77 @@ document.addEventListener('DOMContentLoaded', () => {
   async function carregarProdutos() {
     try {
       produtos = await API.obterProdutos();
+      renderizarChipsCategoria();
       renderizarGridProdutos();
     } catch (err) {
       console.error('Erro ao carregar produtos:', err);
     }
   }
 
+  function renderizarChipsCategoria() {
+    if (!chipsCategoriaModal) return;
+    const cats = [
+      ...new Set(
+        produtos.filter((p) => p.ativo && p.tipo !== 'avulso').map((p) => normalizarCategoria(p.categoria))
+      )
+    ].sort();
+    const all = ['todas', ...cats];
+    if (!all.includes(categoriaAtiva)) categoriaAtiva = 'todas';
+
+    chipsCategoriaModal.innerHTML = all
+      .map((c) => `<button class="chip-categoria ${c === categoriaAtiva ? 'ativo' : ''}" data-categoria="${c}">${c === 'todas' ? 'Todas' : rotuloCategoria(c)}</button>`)
+      .join('');
+
+    chipsCategoriaModal.querySelectorAll('.chip-categoria').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        categoriaAtiva = btn.dataset.categoria || 'todas';
+        renderizarChipsCategoria();
+        renderizarGridProdutos();
+      });
+    });
+  }
+
   function renderizarGridProdutos() {
     const termo = (buscaProdutoModal.value || '').toLowerCase().trim();
-    const filtrados = produtos.filter((p) => p.ativo && p.tipo !== 'avulso' && p.nome.toLowerCase().includes(termo));
-    if (filtrados.length === 0) {
-      gridProdutosModal.innerHTML = '<p class="placeholder">Nenhum produto disponível</p>';
-      return;
-    }
-
-    gridProdutosModal.innerHTML = filtrados
-      .map((p) => {
-        const semEstoque = Number(p.estoque || 0) <= 0;
-        return `<div class="produto-card ${semEstoque ? 'sem-estoque' : ''}" data-id="${p.id}" data-nome="${p.nome}" data-preco="${p.preco}" style="cursor:${semEstoque ? 'not-allowed' : 'pointer'}">
+    const base = produtos.filter((p) => p.ativo && p.tipo !== 'avulso' && p.nome.toLowerCase().includes(termo));
+    const cardHtml = (p) => {
+      const semEstoque = Number(p.estoque || 0) <= 0;
+      const qtdOpcoes = parseOpcoesProduto(p).length;
+      return `<div class="produto-card ${semEstoque ? 'sem-estoque' : ''}" data-id="${p.id}" data-nome="${p.nome}" data-preco="${p.preco}" style="cursor:${semEstoque ? 'not-allowed' : 'pointer'}">
           <div class="produto-nome">${p.nome}</div>
           <div class="produto-preco">${formatarMoeda(p.preco)}</div>
-          <div class="produto-estoque">${p.estoque} em estoque</div>
+          <div class="produto-estoque">${p.estoque} em estoque${qtdOpcoes ? ` • ${qtdOpcoes} opções` : ''}</div>
         </div>`;
-      })
-      .join('');
+    };
+
+    if (categoriaAtiva === 'todas') {
+      gridProdutosModal.classList.add('grouped');
+      const grouped = base.reduce((acc, p) => {
+        const cat = normalizarCategoria(p.categoria);
+        if (!acc[cat]) acc[cat] = [];
+        acc[cat].push(p);
+        return acc;
+      }, {});
+      const cats = Object.keys(grouped).sort();
+      if (!cats.length) {
+        gridProdutosModal.innerHTML = '<p class="placeholder">Nenhum produto disponível</p>';
+        return;
+      }
+      gridProdutosModal.innerHTML = cats
+        .map((cat) => {
+          const cards = grouped[cat].map((p) => cardHtml(p)).join('');
+          return `<section class="categoria-bloco-modal"><h4 class="categoria-titulo-modal">${rotuloCategoria(cat)}</h4><div class="categoria-grid-modal">${cards}</div></section>`;
+        })
+        .join('');
+    } else {
+      gridProdutosModal.classList.remove('grouped');
+      const filtrados = base.filter((p) => normalizarCategoria(p.categoria) === categoriaAtiva);
+      if (filtrados.length === 0) {
+        gridProdutosModal.innerHTML = '<p class="placeholder">Nenhum produto disponível</p>';
+        return;
+      }
+      gridProdutosModal.innerHTML = filtrados.map((p) => cardHtml(p)).join('');
+    }
 
     gridProdutosModal.querySelectorAll('.produto-card').forEach((card) => {
       card.addEventListener('click', async () => {
@@ -106,7 +215,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!produto || Number(produto.estoque || 0) <= 0) return;
         if (!vendaAtiva) return;
         try {
-          await API.adicionarItem(vendaAtiva.id, produtoId, 1);
+          const opcao = escolherOpcaoProduto(produto);
+          if (opcao === null) return;
+          await API.adicionarItem(vendaAtiva.id, produtoId, 1, {
+            observacoes: opcao.observacoes || null,
+            preco_unitario_override: opcao.preco
+          });
           await refreshDados();
           if (vendaAtiva) await abrirVenda(vendaAtiva.id);
           showNotificacao(`${produto.nome} adicionado`);
@@ -156,6 +270,15 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  function aplicarStatusFiltro(status) {
+    statusAtivo = status;
+    document.querySelectorAll('.aba').forEach((a) => a.classList.toggle('aba-ativa', a.dataset.status === statusAtivo));
+    document.querySelectorAll('.status-step').forEach((s) => s.classList.toggle('active', s.dataset.step === statusAtivo));
+    if (statusCurrentLabel) statusCurrentLabel.textContent = statusLabel(statusAtivo);
+    if (statusCurrentDot) statusCurrentDot.style.background = statusColor(statusAtivo);
+    renderizarLista();
+  }
+
   async function abrirVenda(vendaId) {
     try {
       const venda = await API.obterVenda(vendaId);
@@ -173,6 +296,7 @@ document.addEventListener('DOMContentLoaded', () => {
           .map(
             (it) => `<div class="item" data-item-id="${it.id}" style="padding:12px;background:#f9f9f9;border-radius:4px;border:1px solid #eee;display:flex;flex-direction:column;align-items:center;text-align:center;cursor:pointer;transition:all 0.2s">
               <div style="font-weight:bold;font-size:13px;margin-bottom:6px;width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${it.produto_nome}</div>
+              ${it.observacoes ? `<div style="font-size:11px;color:#555;margin-bottom:6px">${it.observacoes}</div>` : ''}
               <div style="color:#666;font-size:12px;margin-bottom:6px">x${it.quantidade}</div>
               <div style="color:var(--success);font-weight:bold;font-size:12px">${formatarMoeda(it.subtotal)}</div>
             </div>`
@@ -385,12 +509,44 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.querySelectorAll('.aba').forEach((aba) => {
     aba.addEventListener('click', () => {
-      statusAtivo = aba.dataset.status;
-      document.querySelectorAll('.aba').forEach((a) => a.classList.remove('aba-ativa'));
-      aba.classList.add('aba-ativa');
-      renderizarLista();
+      aplicarStatusFiltro(aba.dataset.status);
     });
   });
+
+  let touchStartX = 0;
+  let touchStartY = 0;
+  if (mainContentEl) {
+    mainContentEl.addEventListener(
+      'touchstart',
+      (e) => {
+        const t = e.changedTouches && e.changedTouches[0];
+        if (!t) return;
+        touchStartX = t.clientX;
+        touchStartY = t.clientY;
+      },
+      { passive: true }
+    );
+
+    mainContentEl.addEventListener(
+      'touchend',
+      (e) => {
+        const t = e.changedTouches && e.changedTouches[0];
+        if (!t) return;
+        const dx = t.clientX - touchStartX;
+        const dy = t.clientY - touchStartY;
+        if (Math.abs(dx) < 50) return;
+        if (Math.abs(dx) < Math.abs(dy) * 1.2) return;
+
+        const idx = statusOrder.indexOf(statusAtivo);
+        if (dx < 0 && idx < statusOrder.length - 1) {
+          aplicarStatusFiltro(statusOrder[idx + 1]);
+        } else if (dx > 0 && idx > 0) {
+          aplicarStatusFiltro(statusOrder[idx - 1]);
+        }
+      },
+      { passive: true }
+    );
+  }
 
   function atualizarBadges() {
     badgeAbertas.textContent = String(vendas.length);
@@ -400,5 +556,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   aplicarModoModal('produtos');
   refreshDados();
+  if (window.initRealtime) {
+    window.initRealtime((evt) => {
+      if (!evt || !evt.type) return;
+      if (evt.type.startsWith('venda.') || evt.type.startsWith('produto.')) {
+        refreshDados();
+      }
+    });
+  }
   setInterval(refreshDados, 5000);
 });

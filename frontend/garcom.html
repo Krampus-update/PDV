@@ -6,13 +6,46 @@
     <title>Garçom - PDV</title>
     <link rel="stylesheet" href="css/garcom.css">
 </head>
-<body>
-    <div class="container">
-        <header class="header" style="position:relative;padding-bottom:24px">
-            <h1>🍽️ Garçom</h1>
+<body class="app-page garcom-page">
+    <header class="app-topbar">
+        <div class="topbar-left">
+            <div class="topbar-logo">PDV</div>
+            <div class="topbar-brand">
+                <div class="name" id="topRestaurantName">Restaurante</div>
+                <div class="meta" id="topRestaurantMeta">Tenant</div>
+            </div>
             <span id="conexao" class="status online">● Online</span>
-        </header>
+        </div>
 
+        <nav class="topbar-center">
+            <div class="mobile-status-current" aria-label="Status atual">
+                <span class="status-current-dot" id="statusCurrentDot"></span>
+                <span id="statusCurrentLabel">Todas</span>
+                <span class="status-stepper" aria-hidden="true">
+                    <span class="status-step active" data-step="todas"></span>
+                    <span class="status-step" data-step="em_preparo"></span>
+                    <span class="status-step" data-step="pronta"></span>
+                </span>
+            </div>
+        </nav>
+
+        <div class="topbar-right">
+            <div class="topbar-user-wrap">
+                <button id="topUserTrigger" class="topbar-user-trigger" type="button">
+                    <div class="topbar-user">
+                        <div class="user-avatar" id="topUserAvatar">US</div>
+                        <div class="topbar-user-meta">
+                            <div class="user-name" id="topUserName">Usuário</div>
+                            <div class="meta" id="topUserRole"></div>
+                        </div>
+                    </div>
+                </button>
+                <div id="topUserMenu" class="user-menu hidden"></div>
+            </div>
+        </div>
+    </header>
+
+    <div class="container" style="height:calc(100vh - 72px)">
         <button id="btnNovaComanda" class="btn-floating">+</button>
 
         <div class="main-content">
@@ -61,6 +94,7 @@
                 <div id="blocoProdutosModal">
                     <h3>Adicionar Itens</h3>
                     <input type="text" id="buscaProdutoModal" class="search-input" placeholder="🔍 Buscar...">
+                    <div id="chipsCategoriaModal" class="chips-categoria-modal"></div>
                     <div id="gridProdutosModal" class="grid-produtos-modal">
                         <p class="placeholder">Carregando produtos...</p>
                     </div>
@@ -107,7 +141,9 @@
     </div>
 
     <script src="js/api.js"></script>
+    <script src="js/auth-guard.js"></script>
     <script src="js/common.js"></script>
+    <script src="js/config-modal.js"></script>
     <script src="js/garcom.js"></script>
 </body>
 </html>

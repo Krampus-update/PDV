@@ -1,26 +1,9 @@
 # 🚀 Próximos Passos - PDV System
 
-## ✅ Concluído: Backend Básico (implementado)
-
-O backend foi desenvolvido e está funcional localmente. O que já foi implementado e testado:
-
-### 📊 O que foi feito
-- ✅ Conexão com SQLite e criação automática das tabelas (`produtos`, `vendas`, `venda_itens`, `ficha_tecnica`)
-- ✅ Models: `ProdutoModel`, `VendaModel`, `VendaItemModel`
-- ✅ Controllers e rotas REST para produtos e vendas (incluir/atualizar/remover/listar)
-- ✅ Controle de estoque ao adicionar/remover itens
-- ✅ Gerenciamento de status para vendas (aberta, em_preparo, pronta, fechada)
-- ✅ Endpoint de health check `/api/status`
-- ✅ Servir frontend estático pela pasta `frontend`
-
-O servidor foi iniciado localmente e o banco foi criado (veja `pdv.db` na pasta `backend` após a primeira execução).
-
----
-
 ## 📍 Status Atual do Projeto (Mar/2026)
 
-- **Fase atual:** **Transição Fase 4 → Fase 5**
-- **Próxima fase:** iniciar pacote de melhorias (tempo real, autenticação, relatórios e backup)
+- **Fase atual:** **Fase 5 (em andamento)**
+- **Próxima fase:** fechar pendências de UX/operação e iniciar Fase 6 (deploy)
 - Entrada principal atual em `http://localhost:3000` com seleção por perfil
 
 ---
@@ -60,8 +43,6 @@ A raiz agora abre a tela de acesso por perfil:
 - **Cliente** → `painel.html` no desktop e `garcom.html` no mobile
 
 ---
-
-## 🎯 Próximas Fases Recomendadas
 
 ### Fase 2: Frontend Principal (consolidada) ✅
 Implementei a base do frontend e criei interfaces com abas:
@@ -113,22 +94,50 @@ Também há modal para visualização de detalhes e busca de produtos.
 Status desta fase: concluída.
 
 ### Fase 5: Melhorias (Estimado: 2-3 horas)
-- [ ] WebSockets (tempo real)
-- [ ] Autenticação/Login
-- [ ] Relatórios de vendas
-- [ ] Backup automático
-- [ ] Histórico de transações (completo)
+- [x] WebSockets (tempo real)
+- [x] Autenticação/Login
+- [x] Relatórios de vendas
+- [x] Backup automático
+- [x] Histórico de transações (completo)
+- [x] Multi-restaurante (banco separado por tenant)
+- [x] Hierarquia de acesso inicial (`dev > gerente > funcionario`)
+- [x] Gestão de funcionários (criar/listar/editar/excluir) via API e tela de configurações
+- [x] Configurações separadas do painel (`configuracoes.html`)
+- [x] Remoção da tela `pdv.html` (redundante)
+- [x] variações de tamanho/ingredientes (ex.: chopp 300ml/500ml/1L, pizza borda recheada, etc)
+- [x] seleção de variação integrada no painel/garçom (item entra na comanda com preço ajustado e observação da opção)
+- [x] editor de variações por botão `+` no estoque (nome + preço extra por opção, sem textarea manual)
+- [x] controle de acesso por perfil por tela (base implementada em frontend + permissões backend por nível)
+- [ ] melhorias visuais e de usabilidade (ex.: feedback visual ao adicionar item, destaque de itens em preparo, visual do estabelecimento, etc)
+- [x] registro de clientes (CRUD básico + aba Clientes no painel)
+- [x] integração com impressora térmica (modo rede e local Windows, teste e gatilhos automáticos configuráveis)
+- [x] opção de organizar o cardápio por categorias (ex.: bebidas, comidas, sobremesas) para facilitar navegação
+- [x] opção de customizar o cardápio (destaque de promoções + organização por popularidade no painel/estoque)
+- [ ] terminar a tela dos clientes (ex.: histórico de pedidos, fidelidade, etc)
+- [x] configurações em popup pelo menu do usuário (sem navegação para página separada)
+- [ ] melhorar o visual da impressões (ex.: layout do cupom, inclusão de QR code, etc)
+- [ ] caso a forma de pagamento seja pix, gerar QR code para facilitar o pagamento e mostrar a chave pix
+- [ ] implementar a opção de dividir a conta por item ou por valor (ex.: 3 pessoas dividindo uma conta de R$ 150,00, cada uma paga R$ 50,00 ou cada uma paga o valor dos itens que consumiu)
+- [ ] refatorar a tela de estoque para melhorar a usabilidade (ex.: edição inline, busca, categorias, etc)
+- [x] refatorar a tela de comandas para melhorar a usabilidade (ex.: busca por mesa/ID + filtro por status)
+- [ ] refatorar a tela de produção para melhorar a usabilidade (ex.: filtros, organização por tipo, etc)
+- [ ] refatorar a tela de configurações para melhorar a usabilidade (ex.: organização por seções, etc)
+- [ ] refatorar a tela do cliente para melhorar a usabilidade (ex.: histórico de pedidos, fidelidade, etc)
 
 Preparativos já iniciados para Fase 5:
 - [x] Tabela `historico_transacoes` criada no backend
 - [x] Registro automático de eventos principais (produto/venda/item)
 - [x] Endpoint de leitura de histórico: `GET /api/historico`
+- [x] Endpoints de usuários: `GET/POST /api/auth/usuarios`, `PUT/DELETE /api/auth/usuarios/:id`
 
 ### Fase 6: Deploy (Estimado: 2-3 horas)
-- [x] Configuração para rodar como serviço no Windows
-- [x] Configuração de ambiente (variáveis, etc.)
-- [x] Guia de deploy para produção
-- [x] correção de bugs e melhorias pós-deploy
+- [ ] correção de bugs e melhorias pós-deploy (incluindo mas não limitado a refatorar todas as telas do app e limpar codigos comentados e não utilizados)
+- [ ] criar um instalador simples (ex.: script .bat) para facilitar instalação em outros computadores
+- [ ] documentação de instalação e uso para usuários finais (ex.: equipe do bar)
+- [ ] apagar o banco de dados de teste
+- [ ] consolidar a interface para ter o mesmo padrão entre telas e dispositivos (potencialmente seguindo o padrão estabelecido no painel.html)
+- [ ] tela do gerente (relatórios, histórico, gestão de usuários)
+- [ ] tela do dev (full access para testes e debug de todas as funcionalidades)
 
 ---
 
@@ -270,9 +279,9 @@ PDV/
 │   ├── admin.html ✅   (Tester/Admin)
 │   ├── index.html ✅   (Alias para admin.html)
 │   ├── painel.html ✅  (Cliente desktop)
-│   ├── garcom.html ⏳  (Cliente mobile / alinhamento final)
-│   ├── pdv.html ⏳     (Interface Caixa)
-│   ├── producao.html ⏳ (Tela de Produção)
+│   ├── garcom.html ✅  (Cliente mobile alinhado ao desktop)
+│   ├── producao.html ✅ (Tela de Produção - cozinha)
+│   ├── configuracoes.html ✅ (Configurações separadas)
 │   ├── css/ ⏳
 │   └── js/ ⏳
 │

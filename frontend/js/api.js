@@ -12,14 +12,40 @@ console.log(`🔗 API Base: ${API_BASE}`);
 // ===================================
 
 class API {
+    static getToken() {
+        return localStorage.getItem('pdv_token') || '';
+    }
+
+    static setToken(token) {
+        if (token) localStorage.setItem('pdv_token', token);
+        else localStorage.removeItem('pdv_token');
+    }
+
+    static getTenant() {
+        return localStorage.getItem('pdv_tenant') || '';
+    }
+
+    static setTenant(tenant) {
+        if (tenant) localStorage.setItem('pdv_tenant', tenant);
+        else localStorage.removeItem('pdv_tenant');
+    }
+
     static async request(method, endpoint, data = null) {
         try {
+            const token = this.getToken();
+            const tenant = this.getTenant();
             const options = {
                 method,
                 headers: {
                     'Content-Type': 'application/json'
                 }
             };
+            if (token) {
+                options.headers.Authorization = `Bearer ${token}`;
+            }
+            if (tenant) {
+                options.headers['x-tenant-code'] = tenant;
+            }
 
             if (data) {
                 options.body = JSON.stringify(data);
@@ -60,6 +86,69 @@ class API {
         return this.request('DELETE', `/produtos/${id}`);
     }
 
+    // ===== AUTH =====
+    static async registrarRestaurante(dados) {
+        return this.request('POST', '/auth/registrar', dados);
+    }
+
+    static async login(restaurante, login, senha) {
+        return this.request('POST', '/auth/login', { restaurante, login, senha });
+    }
+
+    static async me() {
+        return this.request('GET', '/auth/me');
+    }
+
+    static async logout() {
+        const resp = await this.request('POST', '/auth/logout');
+        this.setToken('');
+        this.setTenant('');
+        localStorage.removeItem('pdv_user');
+        return resp;
+    }
+
+    static async listarUsuarios() {
+        return this.request('GET', '/auth/usuarios');
+    }
+
+    static async criarUsuario(dados) {
+        return this.request('POST', '/auth/usuarios', dados);
+    }
+
+    static async atualizarUsuario(id, dados) {
+        return this.request('PUT', `/auth/usuarios/${id}`, dados);
+    }
+
+    static async removerUsuario(id) {
+        try {
+            return await this.request('DELETE', `/auth/usuarios/${id}`);
+        } catch (error) {
+            // Compatibilidade com versões antigas que só tinham "desativar" por PUT.
+            return this.request('PUT', `/auth/usuarios/${id}`, { ativo: false });
+        }
+    }
+
+    // ===== IMPRESSÃO TÉRMICA =====
+    static async obterConfigImpressao() {
+        return this.request('GET', '/impressao/config');
+    }
+
+    static async salvarConfigImpressao(dados) {
+        return this.request('PUT', '/impressao/config', dados);
+    }
+
+    static async listarImpressorasLocais() {
+        return this.request('GET', '/impressao/locais');
+    }
+
+    static async testarImpressora() {
+        return this.request('POST', '/impressao/teste');
+    }
+
+    static async imprimirVenda(vendaId, tipo = 'balcao') {
+        return this.request('POST', `/impressao/venda/${vendaId}?tipo=${encodeURIComponent(tipo)}`);
+    }
+
     // ===== VENDAS =====
     static async criarVenda(tipo, mesa = null) {
         return this.request('POST', '/vendas', { tipo, mesa });
@@ -92,11 +181,53 @@ class API {
         return this.request('GET', `/vendas/preparacao${query}`);
     }
 
+    // ===== RELATÓRIOS =====
+    static async relatorioResumo(periodo = 'hoje') {
+        return this.request('GET', `/relatorios/resumo?periodo=${encodeURIComponent(periodo)}`);
+    }
+
+    static async relatorioProdutos(limite = 20) {
+        return this.request('GET', `/relatorios/produtos?limite=${encodeURIComponent(limite)}`);
+    }
+
+    // ===== BACKUP =====
+    static async listarBackups() {
+        return this.request('GET', '/backup');
+    }
+
+    static async executarBackup() {
+        return this.request('POST', '/backup/executar');
+    }
+
+    // ===== HISTÓRICO =====
+    static async listarHistorico(limite = 100) {
+        return this.request('GET', `/historico?limite=${encodeURIComponent(limite)}`);
+    }
+
+    // ===== CLIENTES =====
+    static async obterClientes(busca = '') {
+        const query = busca ? `?busca=${encodeURIComponent(busca)}` : '';
+        return this.request('GET', `/clientes${query}`);
+    }
+
+    static async criarCliente(dados) {
+        return this.request('POST', '/clientes', dados);
+    }
+
+    static async atualizarCliente(id, dados) {
+        return this.request('PUT', `/clientes/${id}`, dados);
+    }
+
+    static async removerCliente(id) {
+        return this.request('DELETE', `/clientes/${id}`);
+    }
+
     // ===== ITENS DA VENDA =====
-    static async adicionarItem(vendaId, produtoId, quantidade) {
+    static async adicionarItem(vendaId, produtoId, quantidade, extras = {}) {
         return this.request('POST', `/vendas/${vendaId}/itens`, {
             produto_id: produtoId,
-            quantidade
+            quantidade,
+            ...extras
         });
     }
 

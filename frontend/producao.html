@@ -6,17 +6,39 @@
     <title>Tela de Produção - PDV</title>
     <link rel="stylesheet" href="css/producao.css">
 </head>
-<body>
-    <div class="container">
-        <header class="header">
-            <h1>👨‍🍳 Tela de Produção</h1>
-            <div class="header-info">
-                <span id="conexao" class="status online">● Online</span>
-                <button id="btnRecarregar" class="btn-recarregar">🔄 Recarregar</button>
+<body class="app-page">
+    <header class="app-topbar">
+        <div class="topbar-left">
+            <div class="topbar-logo">PDV</div>
+            <div class="topbar-brand">
+                <div class="name" id="topRestaurantName">Restaurante</div>
+                <div class="meta" id="topRestaurantMeta">Tenant</div>
             </div>
-        </header>
+            <span id="conexao" class="status online">● Online</span>
+        </div>
 
-        <!-- Stats -->
+        <nav class="topbar-center">
+            <span class="topbar-link active">Cozinha</span>
+        </nav>
+
+        <div class="topbar-right">
+            <button id="btnRecarregar" class="btn-topbar">Recarregar</button>
+            <div class="topbar-user-wrap">
+                <button id="topUserTrigger" class="topbar-user-trigger" type="button">
+                    <div class="topbar-user">
+                        <div class="user-avatar" id="topUserAvatar">US</div>
+                        <div>
+                            <div class="user-name" id="topUserName">Usuário</div>
+                            <div class="meta" id="topUserRole"></div>
+                        </div>
+                    </div>
+                </button>
+                <div id="topUserMenu" class="user-menu hidden"></div>
+            </div>
+        </div>
+    </header>
+
+    <div class="container" style="height:calc(100vh - 72px)">
         <div class="stats-container">
             <div class="stat-card">
                 <span class="stat-numero" id="totalEmPreparo">0</span>
@@ -29,7 +51,6 @@
         </div>
 
         <div class="main-content">
-            <!-- Abas: Em Preparo e Prontos -->
             <div class="abas-filtro">
                 <button class="aba aba-ativa" data-status="em_preparo">
                     🍳 Em Preparo
@@ -39,14 +60,12 @@
                 </button>
             </div>
 
-            <!-- Grid de Pedidos -->
             <div id="gridPedidos" class="grid-pedidos">
                 <p class="placeholder">Nenhum pedido em preparo</p>
             </div>
         </div>
     </div>
 
-    <!-- Modal: Detalhes do Pedido -->
     <div id="modalDetalhes" class="modal" style="display: none;">
         <div class="modal-content modal-pedido">
             <div class="modal-header">
@@ -54,7 +73,6 @@
                 <button class="btn-fechar" id="btnFecharModal">&times;</button>
             </div>
 
-            <!-- Informações do Pedido -->
             <div class="info-pedido">
                 <div class="info-item">
                     <span class="info-label">Status:</span>
@@ -70,21 +88,16 @@
                 </div>
             </div>
 
-            <!-- Itens do Pedido -->
             <div class="itens-pedido">
                 <h3>Itens para Preparar</h3>
-                <div id="itensPedido" class="lista-itens">
-                    <!-- Itens serão adicionados dinamicamente -->
-                </div>
+                <div id="itensPedido" class="lista-itens"></div>
             </div>
 
-            <!-- Observações -->
             <div class="observacoes">
                 <h4>Observações:</h4>
                 <p id="observacoesPedido" class="obs-texto">--</p>
             </div>
 
-            <!-- Ações -->
             <div class="modal-acoes">
                 <button id="btnMarcarPronto" class="btn btn-success btn-grande">✅ Marcar como Pronto</button>
                 <button id="btnCancelarDetalhes" class="btn btn-secondary">Voltar</button>
@@ -93,6 +106,9 @@
     </div>
 
     <script src="js/api.js"></script>
+    <script src="js/auth-guard.js"></script>
+    <script src="js/common.js"></script>
+    <script src="js/config-modal.js"></script>
     <script src="js/producao.js"></script>
 </body>
 </html>

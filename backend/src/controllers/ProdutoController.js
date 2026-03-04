@@ -1,5 +1,24 @@
 import ProdutoModel from '../models/ProdutoModel.js';
 import HistoricoModel from '../models/HistoricoModel.js';
+import { broadcast } from '../services/realtimeService.js';
+
+function normalizarOpcoesJson(input) {
+  if (!input) return null;
+  try {
+    const value = typeof input === 'string' ? JSON.parse(input) : input;
+    if (!Array.isArray(value)) return null;
+    const cleaned = value
+      .map((o) => ({
+        nome: String(o?.nome || '').trim(),
+        extra: Number.parseFloat(o?.extra || 0) || 0
+      }))
+      .filter((o) => o.nome);
+    if (!cleaned.length) return null;
+    return JSON.stringify(cleaned);
+  } catch {
+    return null;
+  }
+}
 
 async function registrarHistorico(acao, entidade_id, detalhes = null) {
   try {
@@ -17,7 +36,7 @@ async function registrarHistorico(acao, entidade_id, detalhes = null) {
 class ProdutoController {
   static async criar(req, res) {
     try {
-      const { nome, preco, estoque, estoque_minimo, tipo, imagem, vai_cozinha } = req.body;
+      const { nome, preco, estoque, estoque_minimo, tipo, categoria, destaque, popularidade, opcoes_json, imagem, vai_cozinha } = req.body;
 
       if (!nome || !preco) {
         return res.status(400).json({ error: 'Nome e preço são obrigatórios' });
@@ -29,6 +48,10 @@ class ProdutoController {
         estoque: parseInt(estoque) || 0,
         estoque_minimo: parseInt(estoque_minimo) || 0,
         tipo: tipo || 'simples',
+        categoria: String(categoria || 'geral').trim() || 'geral',
+        destaque: destaque === true || destaque === 1 || destaque === '1',
+        popularidade: parseInt(popularidade, 10) || 0,
+        opcoes_json: normalizarOpcoesJson(opcoes_json),
         imagem: imagem || null,
         vai_cozinha: vai_cozinha === true || vai_cozinha === 1 || vai_cozinha === '1'
       });
@@ -38,6 +61,7 @@ class ProdutoController {
         id: id
       });
       await registrarHistorico('produto_criado', id, { nome, preco: parseFloat(preco) });
+      broadcast('produto.criado', { id, nome });
     } catch (error) {
       console.error('Erro ao criar produto:', error);
       if (error.message.includes('UNIQUE')) {
@@ -78,8 +102,20 @@ class ProdutoController {
     try {
       const { id } = req.params;
       const dados = { ...req.body };
+      if (Object.prototype.hasOwnProperty.call(dados, 'categoria')) {
+        dados.categoria = String(dados.categoria || 'geral').trim() || 'geral';
+      }
       if (Object.prototype.hasOwnProperty.call(dados, 'vai_cozinha')) {
         dados.vai_cozinha = dados.vai_cozinha === true || dados.vai_cozinha === 1 || dados.vai_cozinha === '1';
+      }
+      if (Object.prototype.hasOwnProperty.call(dados, 'destaque')) {
+        dados.destaque = dados.destaque === true || dados.destaque === 1 || dados.destaque === '1';
+      }
+      if (Object.prototype.hasOwnProperty.call(dados, 'popularidade')) {
+        dados.popularidade = parseInt(dados.popularidade, 10) || 0;
+      }
+      if (Object.prototype.hasOwnProperty.call(dados, 'opcoes_json')) {
+        dados.opcoes_json = normalizarOpcoesJson(dados.opcoes_json);
       }
 
       const produto = await ProdutoModel.obterPorId(id);
@@ -90,6 +126,7 @@ class ProdutoController {
       await ProdutoModel.atualizar(id, dados);
       await registrarHistorico('produto_atualizado', parseInt(id, 10), dados);
       res.json({ message: 'Produto atualizado com sucesso' });
+      broadcast('produto.atualizado', { id: parseInt(id, 10), dados });
     } catch (error) {
       console.error('Erro ao atualizar produto:', error);
       res.status(500).json({ error: error.message });
@@ -109,6 +146,7 @@ class ProdutoController {
       await ProdutoModel.atualizar(id, { ativo: 0 });
       await registrarHistorico('produto_deletado', parseInt(id, 10), { nome: produto.nome });
       res.json({ message: 'Produto deletado com sucesso' });
+      broadcast('produto.deletado', { id: parseInt(id, 10) });
     } catch (error) {
       console.error('Erro ao deletar produto:', error);
       res.status(500).json({ error: error.message });

@@ -2,6 +2,11 @@ import express from 'express';
 import produtosRoutes from './produtos.js';
 import vendasRoutes from './vendas.js';
 import historicoRoutes from './historico.js';
+import authRoutes from './auth.js';
+import relatoriosRoutes from './relatorios.js';
+import backupRoutes from './backup.js';
+import impressaoRoutes from './impressao.js';
+import clientesRoutes from './clientes.js';
 
 const router = express.Router();
 
@@ -14,7 +19,12 @@ router.get('/', (req, res) => {
       status: '/api/status',
       produtos: '/api/produtos',
       vendas: '/api/vendas',
-      historico: '/api/historico'
+      historico: '/api/historico',
+      auth: '/api/auth',
+      relatorios: '/api/relatorios',
+      backup: '/api/backup',
+      impressao: '/api/impressao',
+      clientes: '/api/clientes'
     }
   });
 });
@@ -23,6 +33,11 @@ router.get('/', (req, res) => {
 router.use('/produtos', produtosRoutes);
 router.use('/vendas', vendasRoutes);
 router.use('/historico', historicoRoutes);
+router.use('/auth', authRoutes);
+router.use('/relatorios', relatoriosRoutes);
+router.use('/backup', backupRoutes);
+router.use('/impressao', impressaoRoutes);
+router.use('/clientes', clientesRoutes);
 
 // Health check
 router.get('/status', (req, res) => {

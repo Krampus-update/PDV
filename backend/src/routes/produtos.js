@@ -1,7 +1,10 @@
 import express from 'express';
 import ProdutoController from '../controllers/ProdutoController.js';
+import { authOptional, authRequired } from '../middlewares/auth.js';
 
 const router = express.Router();
+
+router.use(authOptional, authRequired);
 
 // Criar novo produto
 router.post('/', ProdutoController.criar);

@@ -3,6 +3,7 @@
 > node server.js
 
 ✓ Banco de dados inicializado com sucesso
+✓ WebSocket realtime ativo em /ws
 
 ===================================
 🚀 PDV System - Backend iniciado
@@ -10,5 +11,7 @@
 📡 Servidor rodando em http://localhost:3000
 🌐 Acessível via rede: http://<seu-ip>:3000
 📊 API de status: http://localhost:3000/api/status
+⚡ Realtime WS: ws://localhost:3000/ws
 ===================================
 
+Deseja finalizar o arquivo em lotes (S/N)? 

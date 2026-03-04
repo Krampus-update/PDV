@@ -207,5 +207,13 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   refreshGeral();
+  if (window.initRealtime) {
+    window.initRealtime((evt) => {
+      if (!evt || !evt.type) return;
+      if (evt.type.startsWith('venda.') || evt.type.startsWith('produto.')) {
+        refreshGeral();
+      }
+    });
+  }
   setInterval(refreshGeral, 5000);
 });

@@ -81,7 +81,138 @@
     };
   }
 
+  function initRealtime(onMessage){
+    try{
+      const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
+      const ws = new WebSocket(`${proto}://${window.location.hostname}:3000/ws`);
+      ws.onmessage = (evt)=>{
+        try{
+          const data = JSON.parse(evt.data);
+          if(typeof onMessage === 'function') onMessage(data);
+        }catch{}
+      };
+      ws.onerror = ()=>{};
+      return ws;
+    }catch{
+      return null;
+    }
+  }
+
+  function userInitials(nome){
+    const base = String(nome || '').trim();
+    if(!base) return 'US';
+    const parts = base.split(/\s+/).filter(Boolean);
+    const a = parts[0]?.[0] || 'U';
+    const b = parts.length > 1 ? (parts[parts.length - 1]?.[0] || '') : '';
+    return `${a}${b}`.toUpperCase();
+  }
+
+  function initTopbarContext(retry){
+    const attempt = Number(retry || 0);
+    const user = JSON.parse(localStorage.getItem('pdv_user') || '{}');
+    const tenant = localStorage.getItem('pdv_tenant') || '';
+    const cfg = JSON.parse(localStorage.getItem('pdv_config') || '{}');
+    if((!user || !user.role) && tenant && attempt < 10){
+      setTimeout(()=>initTopbarContext(attempt + 1), 150);
+      return;
+    }
+
+    const restauranteNome = cfg.nome || (tenant ? `Restaurante ${tenant}` : 'Restaurante');
+    if(cfg.cor){
+      document.documentElement.style.setProperty('--primary', cfg.cor);
+    }
+    const nomeEl = document.getElementById('topRestaurantName');
+    if(nomeEl) nomeEl.textContent = restauranteNome;
+
+    const metaEl = document.getElementById('topRestaurantMeta');
+    if(metaEl) metaEl.textContent = tenant ? `Tenant: ${tenant}` : 'Tenant não definido';
+
+    const userNameEl = document.getElementById('topUserName');
+    if(userNameEl) userNameEl.textContent = user.nome || user.login || 'Usuário';
+
+    const avatarEl = document.getElementById('topUserAvatar');
+    if(avatarEl) avatarEl.textContent = userInitials(user.nome || user.login || 'Usuario');
+
+    const userRoleEl = document.getElementById('topUserRole');
+    if(userRoleEl) userRoleEl.textContent = user.role ? `Perfil: ${user.role}` : '';
+
+    initUserMenu();
+  }
+
+  function initUserMenu(){
+    const trigger = document.getElementById('topUserTrigger');
+    const menu = document.getElementById('topUserMenu');
+    if(!trigger || !menu) return;
+
+    const user = JSON.parse(localStorage.getItem('pdv_user') || '{}');
+    const role = String(user.role || '').toLowerCase();
+    const canManage = role === 'gerente' || role === 'dev';
+    const canAdmin = role === 'gerente' || role === 'dev';
+
+    const operacaoLinks = [
+      '<a href="painel.html">Painel</a>',
+      '<a href="garcom.html">Garçom</a>',
+      '<a href="producao.html">Cozinha</a>'
+    ].join('');
+
+    const gestaoLinks = [
+      canAdmin ? '<a href="admin.html">Admin</a>' : '',
+      canManage ? '<button type="button" data-action="open-config">Configurações</button>' : ''
+    ].filter(Boolean).join('');
+
+    menu.innerHTML = `
+      <div class="user-menu-group-title">Operação</div>
+      ${operacaoLinks}
+      ${gestaoLinks ? `<div class="user-menu-sep"></div><div class="user-menu-group-title">Gestão</div>${gestaoLinks}` : ''}
+      <div class="user-menu-sep"></div>
+      <div class="user-menu-group-title">Sessão</div>
+      <button type="button" data-action="logout">Sair</button>
+    `;
+
+    const closeMenu = () => menu.classList.add('hidden');
+    const openMenu = () => menu.classList.remove('hidden');
+    const toggleMenu = () => menu.classList.toggle('hidden');
+
+    trigger.addEventListener('click', (e)=>{
+      e.preventDefault();
+      e.stopPropagation();
+      toggleMenu();
+    });
+
+    menu.addEventListener('click', (e)=>{
+      const action = e.target?.dataset?.action;
+      if(!action) return;
+      if(action === 'logout'){
+        // o auth-guard escuta esse elemento
+        closeMenu();
+        return;
+      }
+      if(action === 'open-config'){
+        closeMenu();
+        if(window.PDVConfigModal && typeof window.PDVConfigModal.open === 'function'){
+          window.PDVConfigModal.open();
+        }
+      }
+    });
+
+    document.addEventListener('click', (e)=>{
+      if(menu.classList.contains('hidden')) return;
+      if(!menu.contains(e.target) && !trigger.contains(e.target)) closeMenu();
+    });
+
+    openMenu();
+    closeMenu();
+  }
+
   window.formatarMoedaBR = formatarMoedaBR;
   window.converterBufferParaValor = converterBufferParaValor;
   window.criarTeclado = criarTeclado;
+  window.initRealtime = initRealtime;
+  window.initTopbarContext = initTopbarContext;
+
+  if(document.readyState === 'loading'){
+    document.addEventListener('DOMContentLoaded', initTopbarContext);
+  }else{
+    initTopbarContext();
+  }
 })();

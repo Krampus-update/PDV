@@ -4,59 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>PDV - Admin</title>
+    <link rel="stylesheet" href="css/global.css">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            padding: 20px;
-        }
-
-        .container {
-            max-width: 1200px;
-            margin: 0 auto;
-        }
-
-        header {
-            background: white;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
-            margin-bottom: 30px;
-        }
-
-        header h1 {
-            color: #667eea;
-            margin-bottom: 10px;
-        }
-
-        header p {
-            color: #666;
-        }
-
-        .status {
-            display: inline-block;
-            padding: 5px 15px;
-            border-radius: 20px;
-            margin-top: 10px;
-            font-weight: bold;
-        }
-
-        .status.online {
-            background: #4CAF50;
-            color: white;
-        }
-
-        .status.offline {
-            background: #f44336;
-            color: white;
-        }
+        .admin-wrap { padding: 18px; }
 
         .content {
             display: grid;
@@ -65,66 +15,9 @@
             margin-bottom: 20px;
         }
 
-        .card {
-            background: white;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-        }
-
-        .card h2 {
-            color: #667eea;
-            margin-bottom: 15px;
-            font-size: 18px;
-            border-bottom: 2px solid #e0e0e0;
-            padding-bottom: 10px;
-        }
-
-        .form-group {
-            margin-bottom: 15px;
-        }
-
-        label {
-            display: block;
-            margin-bottom: 5px;
-            color: #333;
-            font-weight: 500;
-        }
-
-        input, select, textarea {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            font-size: 14px;
-            transition: border-color 0.3s;
-        }
-
-        input:focus, select:focus, textarea:focus {
-            outline: none;
-            border-color: #667eea;
-            box-shadow: 0 0 5px rgba(102, 126, 234, 0.3);
-        }
-
-        button {
-            background: #667eea;
-            color: white;
-            border: none;
-            padding: 10px 20px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-weight: 600;
-            transition: background 0.3s;
-            width: 100%;
-        }
-
-        button:hover {
-            background: #5568d3;
-        }
-
         .response {
             background: #f5f5f5;
-            border-left: 4px solid #667eea;
+            border-left: 4px solid #1d4ed8;
             padding: 15px;
             border-radius: 5px;
             margin-top: 15px;
@@ -139,41 +32,23 @@
             font-family: 'Courier New', monospace;
         }
 
-        .response.error {
-            border-left-color: #f44336;
-            background: #ffebee;
-        }
+        .response.error { border-left-color: #f44336; background: #ffebee; }
+        .response.success { border-left-color: #4CAF50; background: #e8f5e9; }
 
-        .response.success {
-            border-left-color: #4CAF50;
-            background: #e8f5e9;
-        }
+        .grid-full { grid-column: 1 / -1; }
 
-        .grid-full {
-            grid-column: 1 / -1;
-        }
-
-        .products-list {
-            max-height: 400px;
-            overflow-y: auto;
-        }
+        .products-list { max-height: 400px; overflow-y: auto; }
 
         .product-item {
             background: #f9f9f9;
             padding: 10px;
             border-radius: 5px;
             margin-bottom: 10px;
-            border-left: 3px solid #667eea;
+            border-left: 3px solid #1d4ed8;
         }
 
-        .product-item strong {
-            color: #667eea;
-        }
-
-        .product-item span {
-            color: #666;
-            font-size: 12px;
-        }
+        .product-item strong { color: #1d4ed8; }
+        .product-item span { color: #666; font-size: 12px; }
 
         .button-group {
             display: grid;
@@ -181,30 +56,54 @@
             gap: 10px;
         }
 
-        .button-group button {
-            width: 100%;
-        }
+        .button-group button { width: 100%; }
 
         @media (max-width: 768px) {
-            .content {
-                grid-template-columns: 1fr;
-            }
+            .content { grid-template-columns: 1fr; }
         }
     </style>
 </head>
-<body>
-    <div class="container">
-        <header>
-            <h1>🛠️ PDV System - Admin</h1>
-            <p>Painel legado para operações técnicas e testes da API</p>
-            <div class="status offline" id="status">Offline</div>
-        </header>
+<body class="app-page">
+    <header class="app-topbar">
+        <div class="topbar-left">
+            <div class="topbar-logo">PDV</div>
+            <div class="topbar-brand">
+                <div class="name" id="topRestaurantName">Restaurante</div>
+                <div class="meta" id="topRestaurantMeta">Tenant</div>
+            </div>
+            <span class="status offline" id="status">Offline</span>
+        </div>
+
+        <nav class="topbar-center">
+            <span class="topbar-link active">Admin</span>
+        </nav>
+
+        <div class="topbar-right">
+            <div class="topbar-user-wrap">
+                <button id="topUserTrigger" class="topbar-user-trigger" type="button">
+                    <div class="topbar-user">
+                        <div class="user-avatar" id="topUserAvatar">US</div>
+                        <div>
+                            <div class="user-name" id="topUserName">Usuário</div>
+                            <div class="meta" id="topUserRole"></div>
+                        </div>
+                    </div>
+                </button>
+                <div id="topUserMenu" class="user-menu hidden"></div>
+            </div>
+        </div>
+    </header>
+
+    <div class="admin-wrap">
+        <div class="card" style="margin-bottom:20px">
+            <h2>Painel técnico e testes de API</h2>
+            <p style="color:#64748b">Ferramenta legada para operações administrativas e diagnóstico.</p>
+        </div>
 
         <div class="content">
-            <!-- Produtos -->
             <div class="card">
                 <h2>📦 Produtos</h2>
-                
+
                 <div class="form-group">
                     <label>Nome do Produto</label>
                     <input type="text" id="produto_nome" placeholder="Ex: Cerveja 600ml">
@@ -226,18 +125,17 @@
                 </div>
 
                 <div class="button-group">
-                    <button onclick="criarProduto()">Criar</button>
-                    <button onclick="listarProdutos()">Listar</button>
+                    <button class="btn btn-primary" onclick="criarProduto()">Criar</button>
+                    <button class="btn btn-secondary" onclick="listarProdutos()">Listar</button>
                 </div>
 
                 <div class="response" id="response_produtos" style="display:none;"></div>
                 <div id="produtos_list" class="products-list"></div>
             </div>
 
-            <!-- Vendas -->
             <div class="card">
                 <h2>💰 Vendas</h2>
-                
+
                 <div class="form-group">
                     <label>Tipo de Venda</label>
                     <select id="venda_tipo">
@@ -247,17 +145,16 @@
                 </div>
 
                 <div class="button-group">
-                    <button onclick="criarVenda()">Criar Venda</button>
-                    <button onclick="obterVendasAbertas()">Ver Abertas</button>
+                    <button class="btn btn-primary" onclick="criarVenda()">Criar Venda</button>
+                    <button class="btn btn-secondary" onclick="obterVendasAbertas()">Ver Abertas</button>
                 </div>
 
                 <div class="response" id="response_vendas" style="display:none;"></div>
             </div>
 
-            <!-- Adicionar Item -->
             <div class="card">
                 <h2>🛒 Adicionar Item</h2>
-                
+
                 <div class="form-group">
                     <label>ID da Venda</label>
                     <input type="number" id="item_venda_id" placeholder="Ex: 1" value="1">
@@ -273,14 +170,13 @@
                     <input type="number" id="item_quantidade" placeholder="Ex: 2" value="1">
                 </div>
 
-                <button onclick="adicionarItem()">Adicionar Item</button>
+                <button class="btn btn-primary btn-block" onclick="adicionarItem()">Adicionar Item</button>
                 <div class="response" id="response_item" style="display:none;"></div>
             </div>
 
-            <!-- Fechar Venda -->
             <div class="card">
                 <h2>✅ Fechar Venda</h2>
-                
+
                 <div class="form-group">
                     <label>ID da Venda</label>
                     <input type="number" id="fechar_venda_id" placeholder="Ex: 1" value="1">
@@ -296,41 +192,48 @@
                     </select>
                 </div>
 
-                <button onclick="fecharVenda()">Fechar Venda</button>
+                <button class="btn btn-success btn-block" onclick="fecharVenda()">Fechar Venda</button>
                 <div class="response" id="response_fechar" style="display:none;"></div>
             </div>
 
-            <!-- Ver Venda Completa -->
             <div class="card">
                 <h2>📊 Ver Venda Completa</h2>
-                
+
                 <div class="form-group">
                     <label>ID da Venda</label>
                     <input type="number" id="ver_venda_id" placeholder="Ex: 1" value="1">
                 </div>
 
-                <button onclick="obterVenda()">Ver Venda</button>
+                <button class="btn btn-secondary btn-block" onclick="obterVenda()">Ver Venda</button>
                 <div class="response" id="response_ver_venda" style="display:none;"></div>
             </div>
 
-            <!-- Status da API -->
             <div class="card grid-full">
                 <h2>🔧 Status da API</h2>
                 <div class="button-group">
-                    <button onclick="verificarStatus()">Verificar Status</button>
-                    <button onclick="limparCache()">Limpar Cache Local</button>
+                    <button class="btn btn-primary" onclick="verificarStatus()">Verificar Status</button>
+                    <button class="btn btn-warning" onclick="limparCache()">Limpar Cache Local</button>
                 </div>
                 <div class="response" id="response_status" style="display:none;"></div>
             </div>
         </div>
     </div>
 
+    <script src="js/api.js"></script>
+    <script src="js/auth-guard.js"></script>
+    <script src="js/common.js"></script>
     <script>
         const API_URL = `${window.location.protocol}//${window.location.hostname}:3000/api`;
 
         async function apiRequest(endpoint, options = {}) {
+            const token = (window.API && API.getToken) ? API.getToken() : localStorage.getItem('pdv_token');
+            const tenant = (window.API && API.getTenant) ? API.getTenant() : localStorage.getItem('pdv_tenant');
             const response = await fetch(`${API_URL}${endpoint}`, {
-                headers: { 'Content-Type': 'application/json' },
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+                    ...(tenant ? { 'x-tenant-code': tenant } : {})
+                },
                 ...options
             });
             const data = await response.json();
@@ -340,7 +243,6 @@
             return data;
         }
 
-        // Verificar status ao carregar
         window.addEventListener('load', () => {
             verificarStatus();
             setInterval(verificarStatus, 5000);
@@ -348,7 +250,7 @@
 
         function verificarStatus() {
             apiRequest('/status')
-                .then(data => {
+                .then(() => {
                     document.getElementById('status').className = 'status online';
                     document.getElementById('status').textContent = '🟢 Online';
                 })
@@ -365,7 +267,6 @@
             element.innerHTML = `<pre>${JSON.stringify(dados, null, 2)}</pre>`;
         }
 
-        // PRODUTOS
         function criarProduto() {
             const nome = document.getElementById('produto_nome').value;
             const preco = parseFloat(document.getElementById('produto_preco').value);
@@ -410,7 +311,6 @@
                 .catch(e => mostrarResposta('response_produtos', { erro: e.message }, true));
         }
 
-        // VENDAS
         function criarVenda() {
             const tipo = document.getElementById('venda_tipo').value;
 
@@ -440,7 +340,6 @@
                 .catch(e => mostrarResposta('response_ver_venda', { erro: e.message }, true));
         }
 
-        // ITENS
         function adicionarItem() {
             const venda_id = document.getElementById('item_venda_id').value;
             const produto_id = document.getElementById('item_produto_id').value;
@@ -459,7 +358,6 @@
             .catch(e => mostrarResposta('response_item', { erro: e.message }, true));
         }
 
-        // FECHAR VENDA
         function fecharVenda() {
             const id = document.getElementById('fechar_venda_id').value;
             const forma_pagamento = document.getElementById('forma_pagamento').value;

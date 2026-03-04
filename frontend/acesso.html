@@ -6,13 +6,14 @@
   <title>PDV - Acesso</title>
   <style>
     :root {
-      --bg-a: #0f172a;
-      --bg-b: #1e293b;
+      --bg-a: #0b1324;
+      --bg-b: #17223d;
       --card: #ffffff;
-      --admin: #1d4ed8;
-      --cliente: #047857;
+      --primary: #1d4ed8;
+      --accent: #0f766e;
       --text: #0f172a;
       --muted: #64748b;
+      --error: #b91c1c;
     }
 
     * {
@@ -24,103 +25,144 @@
     body {
       min-height: 100vh;
       font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-      background: radial-gradient(circle at 15% 20%, #334155 0%, var(--bg-a) 45%, var(--bg-b) 100%);
+      background: radial-gradient(circle at 20% 15%, #243763 0%, var(--bg-a) 45%, var(--bg-b) 100%);
       color: var(--text);
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      display: grid;
+      place-items: center;
       padding: 16px;
     }
 
     .wrap {
-      width: min(960px, 100%);
-      display: grid;
-      gap: 18px;
+      width: min(520px, 100%);
+      background: var(--card);
+      border-radius: 18px;
+      box-shadow: 0 20px 44px rgba(2, 6, 23, 0.35);
+      overflow: hidden;
     }
 
-    .hero {
-      background: rgba(255, 255, 255, 0.08);
-      border: 1px solid rgba(255, 255, 255, 0.2);
-      border-radius: 16px;
-      padding: 22px;
+    .header {
+      background: linear-gradient(135deg, #0f172a, #1e293b);
       color: #e2e8f0;
-      backdrop-filter: blur(2px);
+      padding: 22px 22px 16px;
     }
 
-    .hero h1 {
-      font-size: 28px;
-      margin-bottom: 8px;
+    .header h1 {
+      font-size: 24px;
+      margin-bottom: 6px;
     }
 
-    .hero p {
+    .header p {
+      font-size: 13px;
       color: #cbd5e1;
+    }
+
+    .tabs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .tab {
+      border: none;
+      background: #f8fafc;
+      padding: 12px;
+      font-weight: 700;
+      color: #334155;
+      cursor: pointer;
+    }
+
+    .tab.active {
+      background: #ffffff;
+      color: var(--primary);
+      box-shadow: inset 0 -2px 0 var(--primary);
+    }
+
+    .content {
+      padding: 18px 20px 22px;
+    }
+
+    .panel {
+      display: none;
+    }
+
+    .panel.active {
+      display: block;
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+
+    .field label {
+      font-size: 12px;
+      font-weight: 700;
+      color: #334155;
+    }
+
+    .field input {
+      border: 1px solid #cbd5e1;
+      border-radius: 10px;
+      padding: 10px 12px;
       font-size: 14px;
     }
 
-    .cards {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(220px, 1fr));
-      gap: 16px;
-    }
-
-    .card {
-      background: var(--card);
-      border-radius: 16px;
-      padding: 20px;
-      box-shadow: 0 12px 28px rgba(2, 6, 23, 0.2);
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-
-    .card h2 {
-      font-size: 20px;
-    }
-
-    .card p {
+    .hint {
+      margin-bottom: 12px;
       color: var(--muted);
-      font-size: 13px;
-      min-height: 38px;
+      font-size: 12px;
+      line-height: 1.4;
     }
 
-    .btn {
-      border: none;
-      border-radius: 10px;
-      color: white;
-      font-weight: 700;
-      padding: 11px 14px;
-      cursor: pointer;
-      transition: transform 0.15s ease, filter 0.15s ease;
-    }
-
-    .btn:hover {
-      transform: translateY(-1px);
-      filter: brightness(1.05);
-    }
-
-    .btn-admin {
-      background: var(--admin);
-    }
-
-    .btn-cliente {
-      background: var(--cliente);
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
     }
 
     .remember {
-      margin-top: 10px;
+      margin: 6px 0 12px;
       display: flex;
       align-items: center;
       gap: 8px;
-      color: #e2e8f0;
-      font-size: 13px;
+      font-size: 12px;
+      color: #475569;
     }
 
-    @media (max-width: 760px) {
-      .hero h1 {
-        font-size: 24px;
-      }
+    .btn {
+      width: 100%;
+      border: none;
+      border-radius: 10px;
+      color: #fff;
+      padding: 11px 14px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+    }
 
-      .cards {
+    .btn-login {
+      background: var(--primary);
+    }
+
+    .btn-register {
+      background: var(--accent);
+    }
+
+    .status-msg {
+      margin-top: 10px;
+      min-height: 18px;
+      font-size: 12px;
+      color: #334155;
+    }
+
+    .status-msg.error {
+      color: var(--error);
+    }
+
+    @media (max-width: 520px) {
+      .row {
         grid-template-columns: 1fr;
       }
     }
@@ -128,30 +170,81 @@
 </head>
 <body>
   <main class="wrap">
-    <section class="hero">
-      <h1>Sistema PDV</h1>
-      <p>Selecione o perfil para abrir o ambiente correto.</p>
-      <label class="remember">
-        <input id="lembrarAcesso" type="checkbox" checked>
-        Lembrar meu perfil neste dispositivo
-      </label>
-    </section>
+    <header class="header">
+      <h1>Acesso do Restaurante</h1>
+      <p>Entre com o código do restaurante e sua conta. Se for o primeiro acesso, crie a conta administradora.</p>
+    </header>
 
-    <section class="cards">
-      <article class="card">
-        <h2>Admin</h2>
-        <p>Abre o ambiente técnico/administrativo com foco em gestão e suporte.</p>
-        <button id="btnAdmin" class="btn btn-admin">Entrar no Admin</button>
-      </article>
+    <nav class="tabs">
+      <button id="tabLogin" class="tab active" type="button">Entrar</button>
+      <button id="tabCadastro" class="tab" type="button">Criar Conta</button>
+    </nav>
 
-      <article class="card">
-        <h2>Cliente</h2>
-        <p>Abre o painel operacional usado no atendimento diário.</p>
-        <button id="btnCliente" class="btn btn-cliente">Entrar no Painel</button>
-      </article>
+    <section class="content">
+      <div id="painelLogin" class="panel active">
+        <p class="hint">Use o código do restaurante para carregar os dados corretos (produtos, vendas, estoque, etc.).</p>
+
+        <div class="field">
+          <label for="loginRestaurante">Código do restaurante</label>
+          <input id="loginRestaurante" type="text" placeholder="ex: bar_centro">
+        </div>
+
+        <div class="field">
+          <label for="loginUsuario">Usuário</label>
+          <input id="loginUsuario" type="text" placeholder="Seu login">
+        </div>
+
+        <div class="field">
+          <label for="senhaUsuario">Senha</label>
+          <input id="senhaUsuario" type="password" placeholder="Sua senha">
+        </div>
+
+        <label class="remember">
+          <input id="lembrarAcesso" type="checkbox" checked>
+          Lembrar meu acesso neste dispositivo
+        </label>
+
+        <button id="btnEntrar" class="btn btn-login">Entrar</button>
+        <div id="statusLogin" class="status-msg"></div>
+      </div>
+
+      <div id="painelCadastro" class="panel">
+        <p class="hint">Esse cadastro cria um restaurante novo e o primeiro usuário administrador dele.</p>
+
+        <div class="row">
+          <div class="field">
+            <label for="cadCodigo">Código do restaurante</label>
+            <input id="cadCodigo" type="text" placeholder="ex: bar_centro">
+          </div>
+          <div class="field">
+            <label for="cadNomeRestaurante">Nome do restaurante</label>
+            <input id="cadNomeRestaurante" type="text" placeholder="Bar do Centro">
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="field">
+            <label for="cadNomeUsuario">Seu nome</label>
+            <input id="cadNomeUsuario" type="text" placeholder="Nome do responsável">
+          </div>
+          <div class="field">
+            <label for="cadLogin">Login</label>
+            <input id="cadLogin" type="text" placeholder="Usuário admin">
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="cadSenha">Senha</label>
+          <input id="cadSenha" type="password" placeholder="Defina uma senha forte">
+        </div>
+
+        <button id="btnCadastrar" class="btn btn-register">Criar Restaurante + Conta</button>
+        <div id="statusCadastro" class="status-msg"></div>
+      </div>
     </section>
   </main>
 
+  <script src="js/api.js"></script>
   <script src="js/acesso.js"></script>
 </body>
 </html>
