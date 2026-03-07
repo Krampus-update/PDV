@@ -132,7 +132,7 @@ Preparativos já iniciados para Fase 5:
 
 ### Fase 6: Deploy (Estimado: 2-3 horas)
 - [ ] correção de bugs e melhorias pós-deploy (incluindo mas não limitado a refatorar todas as telas do app e limpar codigos comentados e não utilizados)
-- [ ] criar um instalador simples (ex.: script .bat) para facilitar instalação em outros computadores
+- [x] criar instalador bootstrap para máquina nova (instala Git + Node.js LTS + clone GitHub + setup) (`INSTALAR_PDV_GITHUB.bat`)
 - [ ] documentação de instalação e uso para usuários finais (ex.: equipe do bar)
 - [ ] apagar o banco de dados de teste
 - [ ] consolidar a interface para ter o mesmo padrão entre telas e dispositivos (potencialmente seguindo o padrão estabelecido no painel.html)
