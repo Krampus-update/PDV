@@ -281,6 +281,61 @@ document.addEventListener('DOMContentLoaded', () => {
     await carregarCaixaResumo();
   }
 
+  async function concluirAjustesFechamento() {
+    if (!currentMesa) return;
+    const forma = fechFormaPagamento?.value || 'dinheiro';
+    const valorPago = Number.parseFloat(String(fechValorPago?.value || '0').replace(',', '.')) || 0;
+    const splitMode = fechSplitMode?.value || 'nenhum';
+    const descontoTipo = fechDescontoTipo?.value || 'nenhum';
+    const descontoValor = Number.parseFloat(String(fechDescontoValor?.value || '0').replace(',', '.')) || 0;
+    const splitPayload = splitMode === 'por_item' ? splitPayloadAtual : null;
+
+    await calcularFechamento();
+
+    // No modo por item, concluir deve registrar o pagamento parcial imediatamente.
+    if (splitMode === 'por_item' && Array.isArray(splitPayload?.itens) && splitPayload.itens.length > 0) {
+      const resp = await API.fecharVenda(currentMesa.id, forma, '', {
+        valor_pago: valorPago,
+        pagamento_provider: null,
+        split_mode: 'por_item',
+        split_payload_json: splitPayload,
+        desconto_tipo: descontoTipo,
+        desconto_valor: descontoValor,
+        pix_gerar: forma === 'pix'
+      });
+      if (resp?.parcial) {
+        uiNotify(`Pagamento parcial aplicado: ${formatarMoedaBR(resp.valor_pago_parcial || 0)}`, 'success');
+      } else {
+        uiNotify('Comanda totalmente quitada', 'success');
+      }
+      fecharModalFechamento();
+      await carregarMesas();
+      await carregarProdutosCompleto();
+      await carregarCaixaResumo();
+      if (currentMesa) {
+        try {
+          const updated = await API.obterVenda(currentMesa.id);
+          currentMesa = updated;
+          renderSideMesa(updated);
+        } catch {
+          currentMesa = null;
+          const side = document.getElementById('sideMesas');
+          if (side) side.innerHTML = '<p style="color:#999;font-size:12px">Selecione uma comanda à esquerda</p>';
+        }
+      }
+      return;
+    }
+
+    uiNotify('Cálculo aplicado na comanda', 'success');
+    fecharModalFechamento();
+    await carregarMesas();
+    if (currentMesa) {
+      const updated = await API.obterVenda(currentMesa.id);
+      currentMesa = updated;
+      renderSideMesa(updated);
+    }
+  }
+
   let carrinho = [];
   let nextAvulsoId = 1;
   let currentMesa = null;
@@ -332,9 +387,9 @@ document.addEventListener('DOMContentLoaded', () => {
   btnFecharModalVenda?.addEventListener('click', fecharModalFechamento);
   btnCalcularFechamento?.addEventListener('click', async () => {
     try {
-      await calcularFechamento();
+      await concluirAjustesFechamento();
     } catch (e) {
-      await uiAlert(e.message || 'Erro ao calcular fechamento', 'error');
+      await uiAlert(e.message || 'Erro ao concluir cálculo', 'error');
     }
   });
   btnConfirmarFechamento?.addEventListener('click', async () => {
