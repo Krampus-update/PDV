@@ -1,4 +1,16 @@
 document.addEventListener('DOMContentLoaded', () => {
+  const ui = window.PDVUI || {};
+  const uiAlert = async (msg, type = 'info') => {
+    if (ui.alert) return ui.alert(msg, type, 'Configurações');
+    alert(msg);
+  };
+  const uiConfirm = async (msg, opts = {}) => {
+    if (ui.confirm) return ui.confirm(msg, opts);
+    return confirm(msg);
+  };
+  const uiNotify = (msg, type = 'success') => {
+    if (ui.notify) ui.notify({ title: 'Configurações', message: msg, type, keepHistory: true });
+  };
   const cfgNome = document.getElementById('cfgNome');
   const cfgModo = document.getElementById('cfgModo');
   const cfgCor = document.getElementById('cfgCor');
@@ -54,7 +66,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
     localStorage.setItem('pdv_config', JSON.stringify(cfg));
     if (window.initTopbarContext) window.initTopbarContext();
-    alert('Configurações salvas.');
+    uiNotify('Configurações salvas.', 'success');
   }
 
   function setImpStatus(msg, isError = false) {
@@ -213,7 +225,7 @@ document.addEventListener('DOMContentLoaded', () => {
           await API.atualizarUsuario(id, payload);
           await listarUsuarios();
         } catch (e) {
-          alert(e.message || 'Erro ao atualizar usuário');
+          await uiAlert(e.message || 'Erro ao atualizar usuário', 'error');
         }
       });
     });
@@ -223,12 +235,12 @@ document.addEventListener('DOMContentLoaded', () => {
         const item = btn.closest('.user-item');
         const id = item.dataset.id;
         const title = item.querySelector('.user-title')?.textContent || 'usuário';
-        if (!confirm(`Remover ${title}?`)) return;
+        if (!(await uiConfirm(`Remover ${title}?`, { title: 'Equipe' }))) return;
         try {
           await API.removerUsuario(id);
           await listarUsuarios();
         } catch (e) {
-          alert(e.message || 'Erro ao remover usuário');
+          await uiAlert(e.message || 'Erro ao remover usuário', 'error');
         }
       });
     });
@@ -250,7 +262,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const role = novoRole.value;
 
     if (!nome || !login || !senha) {
-      alert('Preencha nome, login e senha.');
+      await uiAlert('Preencha nome, login e senha.', 'warning');
       return;
     }
 
@@ -262,7 +274,7 @@ document.addEventListener('DOMContentLoaded', () => {
       novoRole.value = 'funcionario';
       await listarUsuarios();
     } catch (e) {
-      alert(e.message || 'Erro ao criar usuário');
+      await uiAlert(e.message || 'Erro ao criar usuário', 'error');
     }
   }
 

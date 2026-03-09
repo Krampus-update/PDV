@@ -84,6 +84,28 @@ class ClienteController {
       res.status(500).json({ error: error.message });
     }
   }
+
+  static async historico(req, res) {
+    try {
+      const id = Number(req.params.id);
+      if (!id) return res.status(400).json({ error: 'ID inválido' });
+      const atual = await ClienteModel.obterPorId(id);
+      if (!atual) return res.status(404).json({ error: 'Cliente não encontrado' });
+      const limite = Number(req.query.limite || 30);
+      const pedidos = await ClienteModel.historicoPedidos(id, limite);
+      const totalPedidos = pedidos.length;
+      const faturamento = pedidos.reduce((acc, p) => acc + Number(p.total || 0), 0);
+      res.json({
+        cliente: atual,
+        total_pedidos: totalPedidos,
+        faturamento_total: Number(faturamento.toFixed(2)),
+        pedidos
+      });
+    } catch (error) {
+      console.error('Erro ao obter histórico do cliente:', error);
+      res.status(500).json({ error: error.message });
+    }
+  }
 }
 
 export default ClienteController;

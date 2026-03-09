@@ -62,6 +62,31 @@ class ClienteModel {
     const result = await dbRun('UPDATE clientes SET ativo = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?', [id]);
     return result.changes;
   }
+
+  static async historicoPedidos(id, limite = 30) {
+    const lim = Math.max(1, Math.min(Number.parseInt(limite, 10) || 30, 200));
+    return dbAll(
+      `SELECT
+         v.id,
+         v.tipo,
+         v.status,
+         v.total,
+         v.forma_pagamento,
+         v.mesa,
+         v.created_at,
+         v.closed_at,
+         (
+           SELECT COALESCE(SUM(vi.quantidade), 0)
+           FROM venda_itens vi
+           WHERE vi.venda_id = v.id
+         ) as itens_total
+       FROM vendas v
+       WHERE v.cliente_id = ?
+       ORDER BY v.created_at DESC
+       LIMIT ?`,
+      [id, lim]
+    );
+  }
 }
 
 export default ClienteModel;

@@ -7,6 +7,7 @@ class PDV {
         this.vendaAtiva = null;
         this.produtos = [];
         this.vendas = [];
+        this.ui = window.PDVUI || {};
         this.init();
     }
 
@@ -241,8 +242,10 @@ class PDV {
 
     async cancelarVenda() {
         if (!this.vendaAtiva) return;
-
-        if (confirm('Tem certeza que deseja cancelar esta venda?')) {
+        const confirmado = this.ui.confirm
+            ? await this.ui.confirm('Tem certeza que deseja cancelar esta venda?', { title: 'Cancelar venda' })
+            : confirm('Tem certeza que deseja cancelar esta venda?');
+        if (confirmado) {
             try {
                 await API.atualizarStatus(this.vendaAtiva.id, 'fechada');
                 this.vendaAtiva = null;

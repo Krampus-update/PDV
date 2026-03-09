@@ -59,6 +59,14 @@
                     ✅ Prontos para Entrega
                 </button>
             </div>
+            <div style="display:grid;grid-template-columns:1fr 170px;gap:10px;margin:0 0 12px">
+                <input type="text" id="buscaPedido" class="search-input" placeholder="Buscar por mesa, item ou comanda" style="margin:0">
+                <select id="filtroTipoPedido" class="filter-select">
+                    <option value="todos">Todos</option>
+                    <option value="mesa">Somente mesa</option>
+                    <option value="balcao">Somente balcão</option>
+                </select>
+            </div>
 
             <div id="gridPedidos" class="grid-pedidos">
                 <p class="placeholder">Nenhum pedido em preparo</p>

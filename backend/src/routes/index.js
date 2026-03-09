@@ -7,6 +7,10 @@ import relatoriosRoutes from './relatorios.js';
 import backupRoutes from './backup.js';
 import impressaoRoutes from './impressao.js';
 import clientesRoutes from './clientes.js';
+import caixaRoutes from './caixa.js';
+import pixRoutes from './pix.js';
+import pagamentosRoutes from './pagamentos.js';
+import promocoesRoutes from './promocoes.js';
 
 const router = express.Router();
 
@@ -24,7 +28,12 @@ router.get('/', (req, res) => {
       relatorios: '/api/relatorios',
       backup: '/api/backup',
       impressao: '/api/impressao',
-      clientes: '/api/clientes'
+      clientes: '/api/clientes',
+      caixa: '/api/caixa',
+      pix: '/api/pix',
+      pagamentos: '/api/pagamentos'
+      ,
+      promocoes: '/api/promocoes'
     }
   });
 });
@@ -38,6 +47,10 @@ router.use('/relatorios', relatoriosRoutes);
 router.use('/backup', backupRoutes);
 router.use('/impressao', impressaoRoutes);
 router.use('/clientes', clientesRoutes);
+router.use('/caixa', caixaRoutes);
+router.use('/pix', pixRoutes);
+router.use('/pagamentos', pagamentosRoutes);
+router.use('/promocoes', promocoesRoutes);
 
 // Health check
 router.get('/status', (req, res) => {

@@ -1,8 +1,12 @@
 import VendaModel from '../models/VendaModel.js';
 import VendaItemModel from '../models/VendaItemModel.js';
 import ProdutoModel from '../models/ProdutoModel.js';
+import PromocaoModel from '../models/PromocaoModel.js';
 import HistoricoModel from '../models/HistoricoModel.js';
+import CaixaModel from '../models/CaixaModel.js';
 import { broadcast } from '../services/realtimeService.js';
+import { gerarPixCobranca } from '../services/pixService.js';
+import { processarPagamento } from '../services/paymentGatewayService.js';
 import {
   obterConfiguracao as obterConfigImpressao,
   imprimirVenda as imprimirVendaTermica
@@ -41,22 +45,298 @@ async function tentarImpressaoAutomatica({ vendaId, tipo, flag }) {
 }
 
 class VendaController {
+  static promocaoAtivaNoMomento(promo) {
+    if (!promo || Number(promo.ativo || 0) !== 1) return false;
+    const now = Date.now();
+    if (promo.data_inicio && new Date(promo.data_inicio).getTime() > now) return false;
+    if (promo.data_fim && new Date(promo.data_fim).getTime() < now) return false;
+    return true;
+  }
+
+  static calcularDesconto({ venda, itens, desconto_tipo, desconto_valor }) {
+    const bruto = Number(venda?.subtotal_bruto || venda?.total || 0);
+    const tipo = String(desconto_tipo || '').trim().toLowerCase();
+    const valor = Number(desconto_valor || 0);
+    if (!tipo || ['nenhum', 'none', 'null'].includes(tipo)) return 0;
+    if (tipo === 'percentual') {
+      return valor > 0 ? Math.min(bruto, (bruto * valor) / 100) : 0;
+    }
+    if (tipo === 'fixo') {
+      return valor > 0 ? Math.min(bruto, valor) : 0;
+    }
+    if (tipo === 'leve3pague2') {
+      const grupos = new Map();
+      for (const item of itens || []) {
+        const key = `${item.produto_id}|${Number(item.preco_unitario || 0)}`;
+        if (!grupos.has(key)) grupos.set(key, []);
+        grupos.get(key).push(item);
+      }
+      let desconto = 0;
+      for (const group of grupos.values()) {
+        const quantidade = group.reduce((sum, it) => sum + Number(it.quantidade || 0), 0);
+        if (quantidade < 3) continue;
+        const preco = Number(group[0]?.preco_unitario || 0);
+        desconto += preco * Math.floor(quantidade / 3);
+      }
+      return Math.min(bruto, desconto);
+    }
+    return 0;
+  }
+
+  static async calcularDescontoPromocao({ venda, itens, promocao_id }) {
+    const bruto = Number(venda?.subtotal_bruto || venda?.total || 0);
+    const promo = await PromocaoModel.obterPorId(promocao_id);
+    if (!VendaController.promocaoAtivaNoMomento(promo)) return { desconto: 0, promocao: null };
+
+    if (String(promo.tipo || '') === 'combo_produto') {
+      const itensProduto = (itens || []).filter((i) => Number(i.produto_id) === Number(promo.produto_id));
+      if (!itensProduto.length) return { desconto: 0, promocao: promo };
+      const qtd = itensProduto.reduce((sum, i) => sum + Number(i.quantidade || 0), 0);
+      const subtotalProduto = itensProduto.reduce((sum, i) => sum + Number(i.subtotal || 0), 0);
+      const unit = qtd > 0 ? subtotalProduto / qtd : 0;
+      const packQtd = Math.max(1, Number(promo.quantidade_min || 0));
+      const comboPrice = Number(promo.preco_combo || 0);
+      if (qtd < packQtd || comboPrice <= 0) return { desconto: 0, promocao: promo };
+      const aplicarRepetidamente = Number(promo.repetir_na_venda ?? 1) === 1;
+      const groups = aplicarRepetidamente ? Math.floor(qtd / packQtd) : 1;
+      const precoNormalGroups = groups * packQtd * unit;
+      const precoComboGroups = groups * comboPrice;
+      const desconto = Math.max(0, precoNormalGroups - precoComboGroups);
+      return { desconto: Math.min(bruto, desconto), promocao: promo };
+    }
+
+    return { desconto: 0, promocao: promo };
+  }
+
+  static async calcularMelhorPromocaoAutomatica({ venda, itens }) {
+    const promocoes = await PromocaoModel.listar({ ativo: true });
+    let melhor = { desconto: 0, promocao: null };
+    for (const promo of promocoes || []) {
+      if (!VendaController.promocaoAtivaNoMomento(promo)) continue;
+      const calc = await VendaController.calcularDescontoPromocao({
+        venda,
+        itens,
+        promocao_id: promo.id
+      });
+      if (Number(calc.desconto || 0) > Number(melhor.desconto || 0)) {
+        melhor = calc;
+      }
+    }
+    return melhor;
+  }
+
+  static async aplicarPromocaoAutomaticaSeElegivel(vendaId) {
+    const vendaBase = await VendaModel.obterPorId(vendaId);
+    if (!vendaBase || String(vendaBase.status) === 'fechada') return null;
+    const tipoAtual = String(vendaBase.desconto_tipo || 'nenhum').toLowerCase();
+    const ehManual = ['percentual', 'fixo', 'leve3pague2'].includes(tipoAtual);
+    if (ehManual) return vendaBase;
+
+    await VendaModel.obterTotal(vendaId);
+    const venda = await VendaModel.obterPorId(vendaId);
+    const itens = await VendaItemModel.obterPorVenda(vendaId);
+    const melhor = await VendaController.calcularMelhorPromocaoAutomatica({ venda, itens });
+    const desconto = Number(melhor.desconto || 0);
+
+    if (desconto > 0) {
+      await VendaModel.atualizar(vendaId, {
+        desconto_tipo: 'promocao',
+        desconto_valor: desconto,
+        desconto_descricao: melhor.promocao?.nome || 'Promoção automática',
+        promocao_aplicada_id: melhor.promocao?.id || null
+      });
+    } else {
+      await VendaModel.atualizar(vendaId, {
+        desconto_tipo: 'nenhum',
+        desconto_valor: 0,
+        desconto_descricao: null,
+        promocao_aplicada_id: null
+      });
+    }
+    await VendaModel.obterTotal(vendaId);
+    const atualizada = await VendaModel.obterPorId(vendaId);
+    broadcast('venda.atualizada', { id: Number(vendaId), total: Number(atualizada.total || 0) });
+    return atualizada;
+  }
+
+  static async aplicarFinanceiro(req, res) {
+    try {
+      const { id } = req.params;
+      const venda = await VendaModel.obterPorId(id);
+      if (!venda) return res.status(404).json({ error: 'Venda não encontrada' });
+      if (String(venda.status) === 'fechada') return res.status(400).json({ error: 'Venda já fechada' });
+
+      const itens = await VendaItemModel.obterPorVenda(id);
+      await VendaModel.obterTotal(id);
+      const atual = await VendaModel.obterPorId(id);
+
+      const descontoTipo = String(req.body?.desconto_tipo || atual.desconto_tipo || 'nenhum').toLowerCase();
+      const promocaoIdReq = req.body?.promocao_id || atual.promocao_aplicada_id || null;
+      let descontoCalculado = 0;
+      let promocaoAplicadaId = null;
+      if (descontoTipo === 'promocao') {
+        if (!promocaoIdReq) {
+          const auto = await VendaController.calcularMelhorPromocaoAutomatica({ venda: atual, itens });
+          descontoCalculado = Number(auto.desconto || 0);
+          promocaoAplicadaId = auto.promocao?.id || null;
+        } else {
+          const promoCalc = await VendaController.calcularDescontoPromocao({
+            venda: atual,
+            itens,
+            promocao_id: promocaoIdReq
+          });
+          descontoCalculado = Number(promoCalc.desconto || 0);
+          promocaoAplicadaId = promoCalc.promocao?.id || null;
+        }
+      } else if (descontoTipo === 'nenhum') {
+        const auto = await VendaController.calcularMelhorPromocaoAutomatica({ venda: atual, itens });
+        descontoCalculado = Number(auto.desconto || 0);
+        if (descontoCalculado > 0) {
+          promocaoAplicadaId = auto.promocao?.id || null;
+        }
+      } else {
+        descontoCalculado = VendaController.calcularDesconto({
+          venda: atual,
+          itens,
+          desconto_tipo: descontoTipo,
+          desconto_valor: req.body?.desconto_valor ?? atual.desconto_valor ?? 0
+        });
+      }
+      const acrescimoValor = Math.max(0, Number(req.body?.acrescimo_valor ?? atual.acrescimo_valor ?? 0));
+
+      const splitMode = req.body?.split_mode ? String(req.body.split_mode) : atual.split_mode || null;
+      let splitPayload = atual.split_payload_json || null;
+      if (Object.prototype.hasOwnProperty.call(req.body || {}, 'split_payload_json')) {
+        const payloadRaw = req.body?.split_payload_json;
+        splitPayload = payloadRaw ? JSON.stringify(payloadRaw) : null;
+      }
+
+      await VendaModel.atualizar(id, {
+        desconto_tipo: descontoTipo === 'nenhum' && descontoCalculado > 0 ? 'promocao' : descontoTipo,
+        desconto_valor: descontoCalculado,
+        desconto_descricao:
+          descontoTipo === 'nenhum' && descontoCalculado > 0
+            ? (promocaoAplicadaId ? `Promoção #${promocaoAplicadaId}` : 'Promoção automática')
+            : (req.body?.desconto_descricao || atual.desconto_descricao || null),
+        promocao_aplicada_id: promocaoAplicadaId,
+        acrescimo_valor: acrescimoValor,
+        split_mode: splitMode,
+        split_payload_json: splitPayload
+      });
+      const totalFinal = await VendaModel.obterTotal(id);
+      const vendaAtualizada = await VendaModel.obterPorId(id);
+      await registrarHistorico('venda_financeiro_atualizado', Number(id), {
+        desconto_tipo: descontoTipo,
+        desconto_valor: descontoCalculado,
+        acrescimo_valor: acrescimoValor,
+        total: totalFinal
+      });
+      broadcast('venda.atualizada', { id: Number(id), total: totalFinal });
+      res.json({ venda: vendaAtualizada, total: totalFinal });
+    } catch (error) {
+      console.error('Erro ao aplicar financeiro na venda:', error);
+      res.status(500).json({ error: error.message });
+    }
+  }
+
+  static async simularDivisao(req, res) {
+    try {
+      const { id } = req.params;
+      const venda = await VendaModel.obterPorId(id);
+      if (!venda) return res.status(404).json({ error: 'Venda não encontrada' });
+      const itens = await VendaItemModel.obterPorVenda(id);
+      const modo = String(req.body?.modo || 'valor_igual').toLowerCase();
+      const pessoas = Math.max(1, Number(req.body?.pessoas || 1));
+      const total = Number(venda.total || 0);
+
+      if (modo === 'valor_igual') {
+        const base = total / pessoas;
+        const parcelas = Array.from({ length: pessoas }).map((_, idx) => ({
+          pessoa: idx + 1,
+          valor: Number(base.toFixed(2))
+        }));
+        const soma = parcelas.reduce((s, p) => s + p.valor, 0);
+        const diff = Number((total - soma).toFixed(2));
+        if (parcelas.length && diff !== 0) {
+          parcelas[parcelas.length - 1].valor = Number((parcelas[parcelas.length - 1].valor + diff).toFixed(2));
+        }
+        return res.json({ modo, parcelas });
+      }
+
+      if (modo === 'por_item') {
+        const payload = req.body?.split_payload_json || null;
+        if (payload && Array.isArray(payload.itens)) {
+          let totalSelecionado = 0;
+          const itensSelecionados = [];
+          for (const sel of payload.itens) {
+            const item = itens.find((x) => Number(x.id) === Number(sel.item_id));
+            if (!item) continue;
+            const qtdMax = Number(item.quantidade || 0);
+            const qtdSel = Math.max(0, Math.min(qtdMax, Number(sel.quantidade || 0)));
+            if (qtdSel <= 0) continue;
+            const valor = Number((qtdSel * Number(item.preco_unitario || 0)).toFixed(2));
+            totalSelecionado += valor;
+            itensSelecionados.push({
+              item_id: Number(item.id),
+              produto_nome: item.produto_nome,
+              quantidade: qtdSel,
+              valor
+            });
+          }
+          totalSelecionado = Number(totalSelecionado.toFixed(2));
+          return res.json({
+            modo,
+            parcelas: [
+              { pessoa: 1, itens: itensSelecionados, total: totalSelecionado },
+              { pessoa: 2, itens: [], total: Number((total - totalSelecionado).toFixed(2)) }
+            ]
+          });
+        }
+
+        const grupos = Array.from({ length: pessoas }).map((_, idx) => ({ pessoa: idx + 1, itens: [], total: 0 }));
+        let cursor = 0;
+        for (const item of itens) {
+          const qtd = Number(item.quantidade || 0);
+          const unit = Number(item.preco_unitario || 0);
+          for (let i = 0; i < qtd; i++) {
+            const g = grupos[cursor % pessoas];
+            g.itens.push({ produto_nome: item.produto_nome, valor: unit });
+            g.total += unit;
+            cursor++;
+          }
+        }
+        grupos.forEach((g) => {
+          g.total = Number(g.total.toFixed(2));
+        });
+        return res.json({ modo, parcelas: grupos });
+      }
+
+      return res.status(400).json({ error: 'Modo de divisão inválido' });
+    } catch (error) {
+      console.error('Erro ao simular divisão:', error);
+      res.status(500).json({ error: error.message });
+    }
+  }
+
   static async criar(req, res) {
     try {
-      const { tipo, mesa } = req.body;
+      const { tipo, mesa, cliente_id } = req.body;
 
       if (!tipo || !['bar', 'fastfood'].includes(tipo)) {
         return res.status(400).json({ error: 'Tipo é obrigatório (bar ou fastfood)' });
       }
 
+      const caixaAberto = await CaixaModel.obterAberto();
       const venda = await VendaModel.criar({
         tipo,
         status: tipo === 'fastfood' ? 'em_preparo' : 'aberta',
-        mesa: mesa || null
+        mesa: mesa || null,
+        cliente_id: cliente_id || null,
+        caixa_sessao_id: caixaAberto?.id || null
       });
 
       res.status(201).json(venda);
-      await registrarHistorico('venda_criada', venda.id, { tipo, mesa: mesa || null });
+      await registrarHistorico('venda_criada', venda.id, { tipo, mesa: mesa || null, cliente_id: cliente_id || null });
       broadcast('venda.criada', venda);
     } catch (error) {
       console.error('Erro ao criar venda:', error);
@@ -164,7 +444,21 @@ class VendaController {
 
       const obsNorm = String(observacoes || '').trim() || null;
       const override = Number.parseFloat(preco_unitario_override);
-      const precoUnitario = Number.isFinite(override) && override > 0 ? override : Number(produto.preco);
+      let precoUnitario = Number.isFinite(override) && override > 0 ? override : Number(produto.preco);
+      if (!Number.isFinite(override) || override <= 0) {
+        const promoTipo = String(produto.promocao_tipo || 'nenhuma').toLowerCase();
+        let promoValor = 0;
+        try {
+          promoValor = Number(JSON.parse(produto.promocao_param_json || '{}')?.valor || 0);
+        } catch {
+          promoValor = 0;
+        }
+        if (promoTipo === 'percentual' && promoValor > 0) {
+          precoUnitario = Math.max(0, Number((precoUnitario * (1 - promoValor / 100)).toFixed(2)));
+        } else if (promoTipo === 'fixo' && promoValor > 0) {
+          precoUnitario = Math.max(0, Number((precoUnitario - promoValor).toFixed(2)));
+        }
+      }
 
       // se já existir item equivalente (mesmo produto, mesmo preço e mesma observação), apenas atualiza a quantidade
       const itensVenda = await VendaItemModel.obterPorVenda(id);
@@ -182,6 +476,7 @@ class VendaController {
           await ProdutoModel.atualizarEstoque(produto_id, -qtd);
         }
         await VendaModel.obterTotal(id);
+        await VendaController.aplicarPromocaoAutomaticaSeElegivel(id);
         if (Number(produto.vai_cozinha) === 1 && ['aberta', 'pronta'].includes(venda.status)) {
           await VendaModel.atualizar(id, { status: 'em_preparo' });
           broadcast('venda.status', { id: parseInt(id, 10), status: 'em_preparo' });
@@ -227,6 +522,7 @@ class VendaController {
 
       // Atualizar total da venda
       await VendaModel.obterTotal(id);
+      await VendaController.aplicarPromocaoAutomaticaSeElegivel(id);
       if (Number(produto.vai_cozinha) === 1 && ['aberta', 'pronta'].includes(venda.status)) {
         await VendaModel.atualizar(id, { status: 'em_preparo' });
         broadcast('venda.status', { id: parseInt(id, 10), status: 'em_preparo' });
@@ -269,6 +565,7 @@ class VendaController {
 
       // Atualizar total
       await VendaModel.obterTotal(id);
+      await VendaController.aplicarPromocaoAutomaticaSeElegivel(id);
       await registrarHistorico('item_removido', parseInt(id, 10), {
         item_id: parseInt(item_id, 10),
         produto_id: item.produto_id,
@@ -328,6 +625,7 @@ class VendaController {
 
       // Atualizar total
       await VendaModel.obterTotal(id);
+      await VendaController.aplicarPromocaoAutomaticaSeElegivel(id);
       if (Number(produto.vai_cozinha) === 1 && ['aberta', 'pronta'].includes(venda.status)) {
         await VendaModel.atualizar(id, { status: 'em_preparo' });
         broadcast('venda.status', { id: parseInt(id, 10), status: 'em_preparo' });
@@ -355,7 +653,18 @@ class VendaController {
   static async fechar(req, res) {
     try {
       const { id } = req.params;
-      const { forma_pagamento } = req.body;
+      const {
+        forma_pagamento,
+        valor_pago,
+        pagamento_provider,
+        split_mode,
+        split_payload_json,
+        desconto_tipo,
+        desconto_valor,
+        desconto_descricao,
+        pix_gerar
+      } = req.body || {};
+      const promocaoIdReq = req.body?.promocao_id || null;
 
       if (!forma_pagamento) {
         return res.status(400).json({ error: 'Forma de pagamento é obrigatória' });
@@ -366,11 +675,159 @@ class VendaController {
         return res.status(404).json({ error: 'Venda não encontrada' });
       }
 
+      if (desconto_tipo || desconto_valor || split_mode || split_payload_json) {
+        const itens = await VendaItemModel.obterPorVenda(id);
+        await VendaModel.obterTotal(id);
+        const base = await VendaModel.obterPorId(id);
+        const tipoDescontoAtual = desconto_tipo || base.desconto_tipo;
+        let descontoCalculado = 0;
+        let promocaoAplicadaId = base.promocao_aplicada_id || null;
+        if (String(tipoDescontoAtual || '').toLowerCase() === 'promocao') {
+          const promoAlvo = promocaoIdReq || base.promocao_aplicada_id || null;
+          if (!promoAlvo) {
+            return res.status(400).json({ error: 'Selecione uma promoção válida' });
+          }
+          const promoCalc = await VendaController.calcularDescontoPromocao({
+            venda: base,
+            itens,
+            promocao_id: promoAlvo
+          });
+          descontoCalculado = Number(promoCalc.desconto || 0);
+          promocaoAplicadaId = promoCalc.promocao?.id || null;
+        } else {
+          descontoCalculado = VendaController.calcularDesconto({
+            venda: base,
+            itens,
+            desconto_tipo: tipoDescontoAtual,
+            desconto_valor: desconto_valor ?? base.desconto_valor
+          });
+          promocaoAplicadaId = null;
+        }
+        await VendaModel.atualizar(id, {
+          desconto_tipo: desconto_tipo || base.desconto_tipo || null,
+          desconto_valor: descontoCalculado,
+          desconto_descricao: desconto_descricao || base.desconto_descricao || null,
+          promocao_aplicada_id: promocaoAplicadaId,
+          split_mode: split_mode || base.split_mode || null,
+          split_payload_json: Object.prototype.hasOwnProperty.call(req.body || {}, 'split_payload_json')
+            ? (split_payload_json ? JSON.stringify(split_payload_json) : null)
+            : (base.split_payload_json || null)
+        });
+      }
+      await VendaController.aplicarPromocaoAutomaticaSeElegivel(id);
+
+      const totalFinal = await VendaModel.obterTotal(id);
+      const vendaFechamento = await VendaModel.obterPorId(id);
+      const pago = valor_pago === null || valor_pago === undefined ? null : Number(valor_pago);
+      const troco = pago !== null && pago > totalFinal ? Number((pago - totalFinal).toFixed(2)) : 0;
+
+      const splitModeAtual = String(split_mode || vendaFechamento.split_mode || '').toLowerCase();
+      const splitPayloadAtual = split_payload_json || vendaFechamento.split_payload_json || null;
+      if (splitModeAtual === 'por_item' && splitPayloadAtual) {
+        let payloadObj = splitPayloadAtual;
+        if (typeof payloadObj === 'string') {
+          try {
+            payloadObj = JSON.parse(payloadObj);
+          } catch {
+            payloadObj = null;
+          }
+        }
+        const itensSelecionados = Array.isArray(payloadObj?.itens) ? payloadObj.itens : [];
+        if (itensSelecionados.length) {
+          const itensVenda = await VendaItemModel.obterPorVenda(id);
+          const ajustes = [];
+          let totalSelecionado = 0;
+          for (const sel of itensSelecionados) {
+            const item = itensVenda.find((x) => Number(x.id) === Number(sel.item_id));
+            if (!item) continue;
+            const qtdAtual = Number(item.quantidade || 0);
+            const qtdSel = Math.max(0, Math.min(qtdAtual, Number(sel.quantidade || 0)));
+            if (qtdSel <= 0) continue;
+            totalSelecionado += Number(item.preco_unitario || 0) * qtdSel;
+            ajustes.push({ item, qtdSel, qtdAtual });
+          }
+          totalSelecionado = Number(totalSelecionado.toFixed(2));
+          if (totalSelecionado > 0 && totalSelecionado < totalFinal) {
+            for (const ajuste of ajustes) {
+              if (ajuste.qtdSel >= ajuste.qtdAtual) {
+                await VendaItemModel.deletar(ajuste.item.id);
+              } else {
+                const qtdRestante = ajuste.qtdAtual - ajuste.qtdSel;
+                await VendaItemModel.atualizar(ajuste.item.id, {
+                  quantidade: qtdRestante,
+                  subtotal: Number((qtdRestante * Number(ajuste.item.preco_unitario || 0)).toFixed(2))
+                });
+              }
+            }
+            await VendaController.aplicarPromocaoAutomaticaSeElegivel(id);
+            const totalRestante = await VendaModel.obterTotal(id);
+            const vendaParcial = await VendaModel.obterPorId(id);
+            await registrarHistorico('venda_pagamento_parcial', parseInt(id, 10), {
+              forma_pagamento,
+              valor_pago: totalSelecionado,
+              total_restante: totalRestante
+            });
+            broadcast('venda.atualizada', { id: parseInt(id, 10), total: totalRestante, parcial: true });
+            return res.json({
+              message: 'Pagamento parcial aplicado',
+              parcial: true,
+              valor_pago_parcial: totalSelecionado,
+              venda: vendaParcial
+            });
+          }
+        }
+      }
+
+      let pagamentoStatus = null;
+      let pagamentoTransacao = null;
+      let providerUsado = pagamento_provider || null;
+      if (['credito', 'debito'].includes(String(forma_pagamento || '').toLowerCase())) {
+        const pg = await processarPagamento({
+          vendaId: Number(id),
+          valor: totalFinal,
+          forma_pagamento,
+          descricao: `Venda ${id}`
+        });
+        pagamentoStatus = pg.status;
+        pagamentoTransacao = pg.transacao_id;
+        providerUsado = pg.provider || providerUsado;
+      }
+
+      let pixPayload = null;
+      let pixChave = null;
+      if (String(forma_pagamento || '').toLowerCase() === 'pix' && pix_gerar) {
+        try {
+          const pix = await gerarPixCobranca({ vendaId: Number(id), valor: totalFinal, descricao: `Venda ${id}` });
+          pixPayload = pix.payload;
+          pixChave = pix.chave;
+        } catch {
+          // não bloqueia fechamento por falha de geração de QR
+        }
+      }
+
       await VendaModel.atualizar(id, {
         status: 'fechada',
-        forma_pagamento
+        forma_pagamento,
+        valor_pago: pago,
+        troco_valor: troco,
+        pagamento_provider: providerUsado,
+        pagamento_status: pagamentoStatus,
+        pagamento_transacao_id: pagamentoTransacao,
+        pix_payload: pixPayload,
+        pix_chave_utilizada: pixChave
       });
-      await registrarHistorico('venda_fechada', parseInt(id, 10), { forma_pagamento });
+      if (!vendaFechamento.caixa_sessao_id) {
+        const caixaAberto = await CaixaModel.obterAberto();
+        if (caixaAberto?.id) {
+          await VendaModel.atualizar(id, { caixa_sessao_id: caixaAberto.id });
+        }
+      }
+      await registrarHistorico('venda_fechada', parseInt(id, 10), {
+        forma_pagamento,
+        total: totalFinal,
+        valor_pago: pago,
+        troco
+      });
       broadcast('venda.status', { id: parseInt(id, 10), status: 'fechada' });
       await tentarImpressaoAutomatica({
         vendaId: parseInt(id, 10),
@@ -378,7 +835,8 @@ class VendaController {
         flag: 'auto_fechamento'
       });
 
-      res.json({ message: 'Venda fechada com sucesso' });
+      const vendaFinal = await VendaModel.obterPorId(id);
+      res.json({ message: 'Venda fechada com sucesso', venda: vendaFinal });
     } catch (error) {
       console.error('Erro ao fechar venda:', error);
       res.status(500).json({ error: error.message });
@@ -426,6 +884,51 @@ class VendaController {
       res.json({ message: 'Status atualizado com sucesso' });
     } catch (error) {
       console.error('Erro ao atualizar status:', error);
+      res.status(500).json({ error: error.message });
+    }
+  }
+
+  static async vincularCliente(req, res) {
+    try {
+      const { id } = req.params;
+      const { cliente_id } = req.body || {};
+      const venda = await VendaModel.obterPorId(id);
+      if (!venda) return res.status(404).json({ error: 'Venda não encontrada' });
+      await VendaModel.atualizar(id, { cliente_id: cliente_id || null });
+      const atualizada = await VendaModel.obterPorId(id);
+      await registrarHistorico('venda_cliente_vinculado', parseInt(id, 10), { cliente_id: cliente_id || null });
+      broadcast('venda.atualizada', { id: parseInt(id, 10), cliente_id: cliente_id || null });
+      res.json({ message: 'Cliente vinculado com sucesso', venda: atualizada });
+    } catch (error) {
+      console.error('Erro ao vincular cliente na venda:', error);
+      res.status(500).json({ error: error.message });
+    }
+  }
+
+  static async reabrir(req, res) {
+    try {
+      const { id } = req.params;
+      const venda = await VendaModel.obterPorId(id);
+      if (!venda) return res.status(404).json({ error: 'Venda não encontrada' });
+      if (venda.status !== 'fechada') {
+        return res.status(400).json({ error: 'Somente vendas fechadas podem ser reabertas' });
+      }
+      await VendaModel.atualizar(id, {
+        status: 'aberta',
+        forma_pagamento: null,
+        observacoes: venda.observacoes || null,
+        valor_pago: null,
+        troco_valor: null,
+        pagamento_provider: null,
+        pagamento_status: null,
+        pagamento_transacao_id: null,
+        pix_payload: null
+      });
+      await registrarHistorico('venda_reaberta', parseInt(id, 10), null);
+      broadcast('venda.status', { id: parseInt(id, 10), status: 'aberta' });
+      res.json({ message: 'Venda reaberta com sucesso' });
+    } catch (error) {
+      console.error('Erro ao reabrir venda:', error);
       res.status(500).json({ error: error.message });
     }
   }

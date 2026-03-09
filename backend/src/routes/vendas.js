@@ -32,6 +32,10 @@ router.delete('/:id/itens/:item_id', VendaController.removerItem);
 
 // Atualizar status da venda
 router.put('/:id/status', VendaController.atualizarStatus);
+router.put('/:id/cliente', VendaController.vincularCliente);
+router.put('/:id/reabrir', VendaController.reabrir);
+router.put('/:id/financeiro', VendaController.aplicarFinanceiro);
+router.post('/:id/divisao', VendaController.simularDivisao);
 
 // Marcar pedido como pronto
 router.put('/:id/marcar-pronto', VendaController.marcarPronto);

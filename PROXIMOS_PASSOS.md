@@ -108,21 +108,27 @@ Status desta fase: concluída.
 - [x] seleção de variação integrada no painel/garçom (item entra na comanda com preço ajustado e observação da opção)
 - [x] editor de variações por botão `+` no estoque (nome + preço extra por opção, sem textarea manual)
 - [x] controle de acesso por perfil por tela (base implementada em frontend + permissões backend por nível)
-- [ ] melhorias visuais e de usabilidade (ex.: feedback visual ao adicionar item, destaque de itens em preparo, visual do estabelecimento, etc)
 - [x] registro de clientes (CRUD básico + aba Clientes no painel)
 - [x] integração com impressora térmica (modo rede e local Windows, teste e gatilhos automáticos configuráveis)
 - [x] opção de organizar o cardápio por categorias (ex.: bebidas, comidas, sobremesas) para facilitar navegação
 - [x] opção de customizar o cardápio (destaque de promoções + organização por popularidade no painel/estoque)
-- [ ] terminar a tela dos clientes (ex.: histórico de pedidos, fidelidade, etc)
+- [x] terminar a tela dos clientes (histórico de pedidos por cliente + resumo de faturamento no painel)
 - [x] configurações em popup pelo menu do usuário (sem navegação para página separada)
-- [ ] melhorar o visual da impressões (ex.: layout do cupom, inclusão de QR code, etc)
-- [ ] caso a forma de pagamento seja pix, gerar QR code para facilitar o pagamento e mostrar a chave pix
-- [ ] implementar a opção de dividir a conta por item ou por valor (ex.: 3 pessoas dividindo uma conta de R$ 150,00, cada uma paga R$ 50,00 ou cada uma paga o valor dos itens que consumiu)
-- [ ] refatorar a tela de estoque para melhorar a usabilidade (ex.: edição inline, busca, categorias, etc)
+- [x] refatorar a tela de estoque para melhorar a usabilidade (busca por nome/categoria no painel)
 - [x] refatorar a tela de comandas para melhorar a usabilidade (ex.: busca por mesa/ID + filtro por status)
-- [ ] refatorar a tela de produção para melhorar a usabilidade (ex.: filtros, organização por tipo, etc)
-- [ ] refatorar a tela de configurações para melhorar a usabilidade (ex.: organização por seções, etc)
-- [ ] refatorar a tela do cliente para melhorar a usabilidade (ex.: histórico de pedidos, fidelidade, etc)
+- [x] refatorar a tela de produção para melhorar a usabilidade (busca + filtro por mesa/balcão)
+- [x] refatorar a tela do cliente para melhorar a usabilidade (histórico e resumo financeiro no sidebar)
+- [x] adicionar opção de reabrir venda/comanda fechada (endpoint backend `PUT /api/vendas/:id/reabrir`)
+- [x] refatorar a tela de configurações para melhorar a usabilidade (organização em seções: restaurante, impressão, PIX e gateway)
+- [x] melhorar o visual da impressões (layout de cupom aprimorado com subtotal/desconto/troco e bloco PIX)
+- [x] caso a forma de pagamento seja pix, gerar QR code para facilitar o pagamento e mostrar a chave pix
+- [x] implementar a opção de dividir a conta por item ou por valor (simulação de divisão com preview no fechamento)
+- [x] adicionar promoções e descontos (desconto percentual/fixo e promoção "leve 3 pague 2")
+- [x] abrir e fechar caixa (controle por perfil, registro de abertura/fechamento e resumo de fluxo por forma de pagamento)
+- [x] integração com sistema de pagamento (estrutura pronta com providers manual/mock/cielo/pagseguro; Cielo/PagSeguro em modo simulado)
+- [x] calcular troco automaticamente com base no valor total da venda e no valor pago pelo cliente
+- [x] historico de comandas fechadas (com detalhes para consulta no painel, mantendo fechadas listadas abaixo das abertas)
+- [x] melhorias visuais e de usabilidade (feedback visual integrado, avisos no app, destaque de status e fechamento assistido)
 
 Preparativos já iniciados para Fase 5:
 - [x] Tabela `historico_transacoes` criada no backend

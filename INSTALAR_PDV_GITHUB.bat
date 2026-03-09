@@ -200,33 +200,21 @@ set "STOP_SCRIPT=%APP_DIR%\PARAR_PDV.bat"
   echo ^)
   echo pause
 )
-set "SHORTCUT_LOG=%APP_DIR%\install_shortcuts.log"
-if exist "%SHORTCUT_LOG%" del /f /q "%SHORTCUT_LOG%" >nul 2>&1
+set "DESKTOP_TARGET="
+if exist "%USERPROFILE%\Desktop" set "DESKTOP_TARGET=%USERPROFILE%\Desktop"
+if not defined DESKTOP_TARGET if exist "%USERPROFILE%\OneDrive\Desktop" set "DESKTOP_TARGET=%USERPROFILE%\OneDrive\Desktop"
+if not defined DESKTOP_TARGET if exist "%PUBLIC%\Desktop" set "DESKTOP_TARGET=%PUBLIC%\Desktop"
 
-powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-"$ErrorActionPreference='Stop'; ^
- $desktop = [Environment]::GetFolderPath('Desktop'); ^
- if ([string]::IsNullOrWhiteSpace($desktop)) { $desktop = Join-Path $env:USERPROFILE 'Desktop' }; ^
- if (-not (Test-Path -LiteralPath $desktop)) { New-Item -ItemType Directory -Path $desktop -Force | Out-Null }; ^
- $ws = New-Object -ComObject WScript.Shell; ^
- $lnk1Path = Join-Path $desktop 'PDV - Iniciar.lnk'; ^
- $lnk1 = $ws.CreateShortcut($lnk1Path); ^
- $lnk1.TargetPath = '%START_SCRIPT%'; ^
- $lnk1.WorkingDirectory = '%APP_DIR%'; ^
- $lnk1.IconLocation = Join-Path $env:SystemRoot 'System32\shell32.dll,25'; ^
- $lnk1.Save(); ^
- $lnk2Path = Join-Path $desktop 'PDV - Parar.lnk'; ^
- $lnk2 = $ws.CreateShortcut($lnk2Path); ^
- $lnk2.TargetPath = '%STOP_SCRIPT%'; ^
- $lnk2.WorkingDirectory = '%APP_DIR%'; ^
- $lnk2.IconLocation = Join-Path $env:SystemRoot 'System32\shell32.dll,28'; ^
- $lnk2.Save(); ^
- Write-Output ('DesktopAtalhos=' + $desktop)" > "%SHORTCUT_LOG%" 2>&1
-
-if errorlevel 1 (
-  echo [AVISO] Nao foi possivel criar atalhos automaticamente.
-  echo         Veja: %SHORTCUT_LOG%
-  echo         A instalacao do PDV continuou normalmente.
+if defined DESKTOP_TARGET (
+  copy /Y "%START_SCRIPT%" "%DESKTOP_TARGET%\PDV - Iniciar.bat" >nul 2>&1
+  copy /Y "%STOP_SCRIPT%" "%DESKTOP_TARGET%\PDV - Parar.bat" >nul 2>&1
+  if errorlevel 1 (
+    echo [AVISO] Nao foi possivel copiar atalhos .bat para a Area de Trabalho.
+  ) else (
+    echo Atalhos .bat criados em: %DESKTOP_TARGET%
+  )
+) else (
+  echo [AVISO] Nao foi possivel localizar a Area de Trabalho para copiar atalhos.
 )
 
 echo.
@@ -237,7 +225,6 @@ echo.
 echo Pasta: %APP_DIR%
 echo Inicio: %START_SCRIPT%
 echo Parar : %STOP_SCRIPT%
-if exist "%SHORTCUT_LOG%" type "%SHORTCUT_LOG%"
 echo.
 echo Acesso local apos iniciar:
 echo http://localhost:3000

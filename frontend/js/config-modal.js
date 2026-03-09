@@ -70,7 +70,7 @@
           </section>
 
           <section class="cfg-popup-pane" data-pane="impressao">
-            <div class="cfg-card">
+            <div class="cfg-card" style="margin-bottom:12px">
               <label style="font-size:12px;display:flex;align-items:center;gap:6px;margin-bottom:8px">
                 <input id="impHabilitada" type="checkbox"> Habilitar impressão
               </label>
@@ -112,6 +112,72 @@
                 <button id="btnTesteImpressora" class="btn btn-secondary" type="button">Imprimir teste</button>
               </div>
               <small id="impStatus" style="display:block;margin-top:8px;color:#64748b"></small>
+            </div>
+            <div class="cfg-grid">
+              <div class="cfg-card">
+                <h4 style="margin:0 0 8px;color:#0f172a">PIX</h4>
+                <label style="font-size:12px;display:flex;align-items:center;gap:6px;margin-bottom:8px">
+                  <input id="pixHabilitado" type="checkbox"> Habilitar Pix
+                </label>
+                <div class="form-group">
+                  <label for="pixChave">Chave Pix</label>
+                  <input id="pixChave" type="text" placeholder="email, telefone, EVP...">
+                </div>
+                <div class="form-group">
+                  <label for="pixNomeRecebedor">Nome recebedor</label>
+                  <input id="pixNomeRecebedor" type="text" placeholder="Nome do estabelecimento">
+                </div>
+                <div class="form-group">
+                  <label for="pixCidade">Cidade</label>
+                  <input id="pixCidade" type="text" placeholder="SAO PAULO">
+                </div>
+                <div class="form-group">
+                  <label for="pixDescricaoPadrao">Descrição padrão</label>
+                  <input id="pixDescricaoPadrao" type="text" placeholder="Pagamento PDV">
+                </div>
+                <div class="cfg-actions">
+                  <button id="btnSalvarPix" class="btn btn-primary" type="button">Salvar PIX</button>
+                </div>
+                <small id="pixStatus" style="display:block;margin-top:8px;color:#64748b"></small>
+              </div>
+              <div class="cfg-card">
+                <h4 style="margin:0 0 8px;color:#0f172a">Gateway de pagamento</h4>
+                <label style="font-size:12px;display:flex;align-items:center;gap:6px;margin-bottom:8px">
+                  <input id="pagAtivo" type="checkbox"> Ativar integração
+                </label>
+                <div class="form-group">
+                  <label for="pagProvider">Provider</label>
+                  <select id="pagProvider">
+                    <option value="manual">Manual</option>
+                    <option value="mock">Mock (teste)</option>
+                    <option value="cielo">Cielo (simulado)</option>
+                    <option value="pagseguro">PagSeguro (simulado)</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="pagAmbiente">Ambiente</label>
+                  <select id="pagAmbiente">
+                    <option value="sandbox">Sandbox</option>
+                    <option value="producao">Produção</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="pagMerchantId">Merchant ID</label>
+                  <input id="pagMerchantId" type="text" placeholder="Cielo Merchant ID">
+                </div>
+                <div class="form-group">
+                  <label for="pagMerchantKey">Merchant Key</label>
+                  <input id="pagMerchantKey" type="password" placeholder="Cielo Merchant Key">
+                </div>
+                <div class="form-group">
+                  <label for="pagPagseguroToken">Token PagSeguro</label>
+                  <input id="pagPagseguroToken" type="password" placeholder="Token PagSeguro">
+                </div>
+                <div class="cfg-actions">
+                  <button id="btnSalvarPagamento" class="btn btn-primary" type="button">Salvar gateway</button>
+                </div>
+                <small id="pagStatus" style="display:block;margin-top:8px;color:#64748b"></small>
+              </div>
             </div>
           </section>
 
@@ -171,6 +237,18 @@
   }
 
   function initConfigLogic(modal) {
+    const ui = window.PDVUI || {};
+    const uiAlert = async (msg, type = 'info') => {
+      if (ui.alert) return ui.alert(msg, type, 'Configurações');
+      alert(msg);
+    };
+    const uiConfirm = async (msg, opts = {}) => {
+      if (ui.confirm) return ui.confirm(msg, opts);
+      return confirm(msg);
+    };
+    const uiNotify = (msg, type = 'success') => {
+      if (ui.notify) ui.notify({ title: 'Configurações', message: msg, type, keepHistory: true });
+    };
     const currentUser = readUser();
     const cfgNome = modal.querySelector('#cfgNome');
     const cfgModo = modal.querySelector('#cfgModo');
@@ -192,6 +270,21 @@
     const btnListarImpressoras = modal.querySelector('#btnListarImpressoras');
     const btnTesteImpressora = modal.querySelector('#btnTesteImpressora');
     const impStatus = modal.querySelector('#impStatus');
+    const pixHabilitado = modal.querySelector('#pixHabilitado');
+    const pixChave = modal.querySelector('#pixChave');
+    const pixNomeRecebedor = modal.querySelector('#pixNomeRecebedor');
+    const pixCidade = modal.querySelector('#pixCidade');
+    const pixDescricaoPadrao = modal.querySelector('#pixDescricaoPadrao');
+    const btnSalvarPix = modal.querySelector('#btnSalvarPix');
+    const pixStatus = modal.querySelector('#pixStatus');
+    const pagAtivo = modal.querySelector('#pagAtivo');
+    const pagProvider = modal.querySelector('#pagProvider');
+    const pagAmbiente = modal.querySelector('#pagAmbiente');
+    const pagMerchantId = modal.querySelector('#pagMerchantId');
+    const pagMerchantKey = modal.querySelector('#pagMerchantKey');
+    const pagPagseguroToken = modal.querySelector('#pagPagseguroToken');
+    const btnSalvarPagamento = modal.querySelector('#btnSalvarPagamento');
+    const pagStatus = modal.querySelector('#pagStatus');
 
     const novoNome = modal.querySelector('#novoNome');
     const novoLogin = modal.querySelector('#novoLogin');
@@ -206,6 +299,14 @@
     function setImpStatus(msg, isError) {
       impStatus.textContent = msg || '';
       impStatus.style.color = isError ? '#b91c1c' : '#64748b';
+    }
+    function setPixStatus(msg, isError) {
+      pixStatus.textContent = msg || '';
+      pixStatus.style.color = isError ? '#b91c1c' : '#64748b';
+    }
+    function setPagStatus(msg, isError) {
+      pagStatus.textContent = msg || '';
+      pagStatus.style.color = isError ? '#b91c1c' : '#64748b';
     }
 
     function atualizarCamposImpressora() {
@@ -231,7 +332,7 @@
       localStorage.setItem('pdv_config', JSON.stringify(cfg));
       applyThemeColor(cfg.cor);
       if (window.initTopbarContext) window.initTopbarContext();
-      alert('Configurações salvas.');
+      uiNotify('Configurações salvas.', 'success');
     }
 
     async function loadPrinterCfg() {
@@ -287,6 +388,64 @@
         setImpStatus('Teste enviado para a impressora.', false);
       } catch (e) {
         setImpStatus(e.message || 'Erro no teste da impressora', true);
+      }
+    }
+
+    async function loadPixCfg() {
+      try {
+        const cfg = await API.obterConfigPix();
+        pixHabilitado.checked = !!cfg.habilitado;
+        pixChave.value = cfg.chave || '';
+        pixNomeRecebedor.value = cfg.nome_recebedor || '';
+        pixCidade.value = cfg.cidade || '';
+        pixDescricaoPadrao.value = cfg.descricao_padrao || '';
+      } catch (e) {
+        setPixStatus(e.message || 'Erro ao carregar PIX', true);
+      }
+    }
+
+    async function salvarPixCfg() {
+      try {
+        await API.salvarConfigPix({
+          habilitado: !!pixHabilitado.checked,
+          chave: pixChave.value.trim(),
+          nome_recebedor: pixNomeRecebedor.value.trim(),
+          cidade: pixCidade.value.trim(),
+          descricao_padrao: pixDescricaoPadrao.value.trim()
+        });
+        setPixStatus('Configuração PIX salva com sucesso.', false);
+      } catch (e) {
+        setPixStatus(e.message || 'Erro ao salvar PIX', true);
+      }
+    }
+
+    async function loadPagCfg() {
+      try {
+        const cfg = await API.obterConfigPagamento();
+        pagAtivo.checked = !!cfg.ativo;
+        pagProvider.value = cfg.provider || 'manual';
+        pagAmbiente.value = cfg.ambiente || 'sandbox';
+        pagMerchantId.value = cfg.merchant_id || '';
+        pagMerchantKey.value = cfg.merchant_key || '';
+        pagPagseguroToken.value = cfg.pagseguro_token || '';
+      } catch (e) {
+        setPagStatus(e.message || 'Erro ao carregar gateway', true);
+      }
+    }
+
+    async function salvarPagCfg() {
+      try {
+        await API.salvarConfigPagamento({
+          ativo: !!pagAtivo.checked,
+          provider: pagProvider.value,
+          ambiente: pagAmbiente.value,
+          merchant_id: pagMerchantId.value.trim(),
+          merchant_key: pagMerchantKey.value.trim(),
+          pagseguro_token: pagPagseguroToken.value.trim()
+        });
+        setPagStatus('Configuração de gateway salva.', false);
+      } catch (e) {
+        setPagStatus(e.message || 'Erro ao salvar gateway', true);
       }
     }
 
@@ -369,7 +528,7 @@
             await API.atualizarUsuario(id, payload);
             await listarUsuarios();
           } catch (e) {
-            alert(e.message || 'Erro ao atualizar usuário');
+            await uiAlert(e.message || 'Erro ao atualizar usuário', 'error');
           }
         });
       });
@@ -378,12 +537,12 @@
         btn.addEventListener('click', async () => {
           const item = btn.closest('.cfg-user-item');
           const id = item.dataset.id;
-          if (!confirm('Remover usuário?')) return;
+          if (!(await uiConfirm('Remover usuário?', { title: 'Equipe' }))) return;
           try {
             await API.removerUsuario(id);
             await listarUsuarios();
           } catch (e) {
-            alert(e.message || 'Erro ao remover usuário');
+            await uiAlert(e.message || 'Erro ao remover usuário', 'error');
           }
         });
       });
@@ -403,7 +562,7 @@
       const login = String(novoLogin.value || '').trim();
       const senha = novoSenha.value || '';
       const role = novoRole.value;
-      if (!nome || !login || !senha) return alert('Preencha nome, login e senha.');
+      if (!nome || !login || !senha) return uiAlert('Preencha nome, login e senha.', 'warning');
       try {
         await API.criarUsuario({ nome, login, senha, role });
         novoNome.value = '';
@@ -412,7 +571,7 @@
         novoRole.value = 'funcionario';
         await listarUsuarios();
       } catch (e) {
-        alert(e.message || 'Erro ao criar usuário');
+        await uiAlert(e.message || 'Erro ao criar usuário', 'error');
       }
     }
 
@@ -431,6 +590,8 @@
     btnSalvarImpressora.addEventListener('click', salvarPrinterCfg);
     btnListarImpressoras.addEventListener('click', listarImpressorasLocais);
     btnTesteImpressora.addEventListener('click', testarImpressora);
+    btnSalvarPix.addEventListener('click', salvarPixCfg);
+    btnSalvarPagamento.addEventListener('click', salvarPagCfg);
     filtroUsuario.addEventListener('input', renderUsers);
     btnCriarUsuario.addEventListener('click', criarUsuario);
 
@@ -438,7 +599,7 @@
       loadAll: async () => {
         loadCfg();
         atualizarCamposImpressora();
-        await Promise.all([loadPrinterCfg(), listarUsuarios()]);
+        await Promise.all([loadPrinterCfg(), loadPixCfg(), loadPagCfg(), listarUsuarios()]);
       }
     };
   }

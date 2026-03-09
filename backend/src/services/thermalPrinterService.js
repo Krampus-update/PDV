@@ -154,8 +154,26 @@ function buildVendaTicket(venda, itens, cfg, tipo = 'balcao') {
 
   rows.push(line(width));
   if (tipo !== 'cozinha') {
-    rows.push(`TOTAL: R$ ${money(total)}`.slice(0, width));
+    const bruto = Number(venda.subtotal_bruto || total);
+    const desconto = Number(venda.desconto_valor || 0);
+    const acrescimo = Number(venda.acrescimo_valor || 0);
+    if (desconto > 0) rows.push(`Desconto: -R$ ${money(desconto)}`.slice(0, width));
+    if (acrescimo > 0) rows.push(`Acréscimo: +R$ ${money(acrescimo)}`.slice(0, width));
+    rows.push(`Subtotal: R$ ${money(bruto)}`.slice(0, width));
+    rows.push(`TOTAL: R$ ${money(Number(venda.total || total))}`.slice(0, width));
     if (venda.forma_pagamento) rows.push(`PAGTO: ${venda.forma_pagamento}`.slice(0, width));
+    if (Number(venda.valor_pago || 0) > 0) rows.push(`Pago: R$ ${money(venda.valor_pago)}`.slice(0, width));
+    if (Number(venda.troco_valor || 0) > 0) rows.push(`Troco: R$ ${money(venda.troco_valor)}`.slice(0, width));
+    if (venda.split_mode) rows.push(`Divisão: ${String(venda.split_mode)}`.slice(0, width));
+    if (venda.pix_chave_utilizada) {
+      rows.push(line(width));
+      rows.push('PIX');
+      rows.push(`Chave: ${String(venda.pix_chave_utilizada)}`.slice(0, width));
+      if (venda.pix_payload) {
+        rows.push('Copia e cola:');
+        rows.push(...wrap(String(venda.pix_payload), width));
+      }
+    }
   } else {
     rows.push(`Itens cozinha: ${itensUsados.length}`.slice(0, width));
   }

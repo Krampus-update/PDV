@@ -191,6 +191,7 @@
       <button class="topbar-tab tab" data-target="produtos">Estoque</button>
       <button class="topbar-tab tab" data-target="mesas">Comandas</button>
       <button class="topbar-tab tab" data-target="clientes">Clientes</button>
+      <button class="topbar-tab tab" data-target="promocoes">Promoções</button>
     </nav>
 
     <div class="topbar-right">
@@ -258,6 +259,7 @@
         <div class="main-content">
           <h2>Estoque e Cardápio</h2>
           <div class="main-content-scroll">
+            <input type="text" id="buscaProdutoEstoque" placeholder="Buscar produto por nome/categoria" style="margin-bottom:10px;">
             <div id="prodList" class="product-list"></div>
           </div>
         </div>
@@ -300,8 +302,14 @@
     <section id="mesas" class="tab-content hidden">
       <div class="two-column-layout">
         <div class="main-content">
-          <h2>Comandas Abertas</h2>
+          <h2>Comandas</h2>
           <div class="main-content-scroll">
+            <div id="caixaResumoComandas" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px;padding:10px;border:1px solid #e2e8f0;border-radius:10px;background:#fff">
+              <span id="caixaStatusTag" class="status-badge fechada">Caixa fechado</span>
+              <span id="caixaInfoResumo" style="font-size:12px;color:#475569;flex:1">Sem sessão ativa.</span>
+              <button id="btnAbrirCaixa" class="btn btn-primary btn-soft" type="button">Abrir Caixa</button>
+              <button id="btnFecharCaixa" class="btn btn-secondary btn-soft" type="button">Fechar Caixa</button>
+            </div>
             <div style="display:grid;grid-template-columns:1fr 150px;gap:8px;margin-bottom:10px">
               <input type="text" id="buscaComanda" placeholder="Buscar por mesa, balcão ou ID" style="font-size:12px;padding:8px">
               <select id="filtroStatusComanda" style="font-size:12px;padding:8px">
@@ -309,6 +317,7 @@
                 <option value="aberta">Aberta</option>
                 <option value="em_preparo">Em preparo</option>
                 <option value="pronta">Pronta</option>
+                <option value="fechada">Fechada</option>
               </select>
             </div>
             <div id="listaMesas" class="mesas-list"></div>
@@ -340,10 +349,144 @@
             <button id="btnSalvarCliente" class="btn btn-primary btn-block" style="font-size:12px;padding:10px">Salvar Cliente</button>
             <button id="btnCancelarCliente" class="btn secondary btn-block" style="font-size:12px;padding:10px;display:none;margin-top:8px">Cancelar</button>
           </div>
+          <hr style="margin:12px 0;border:none;border-top:1px solid #eee">
+          <div class="sidebar-section">
+            <h3>Histórico do Cliente</h3>
+            <div id="clienteResumoHistorico" style="font-size:12px;color:#64748b;margin-bottom:8px">Selecione um cliente para ver o histórico.</div>
+            <div id="clienteHistoricoLista" class="cart-section" style="max-height:220px"></div>
+          </div>
         </div>
       </div>
     </section>
 
+    <section id="promocoes" class="tab-content hidden">
+      <div class="two-column-layout">
+        <div class="main-content">
+          <h2>Promoções</h2>
+          <div class="main-content-scroll">
+            <div id="listaPromocoes" class="product-list"></div>
+          </div>
+        </div>
+        <div class="sidebar" id="sidePromocoes">
+          <div class="sidebar-section">
+            <h3>Nova Promoção</h3>
+            <input type="text" id="promoNome" placeholder="Nome da promoção" style="margin-bottom:8px">
+            <textarea id="promoDescricao" placeholder="Descrição (opcional)" style="min-height:70px;margin-bottom:8px"></textarea>
+            <select id="promoTipo" style="margin-bottom:8px">
+              <option value="combo_produto">Combo de produto</option>
+            </select>
+            <label style="font-size:12px;color:#64748b;margin-bottom:4px;display:block">Produto</label>
+            <select id="promoProdutoId" style="margin-bottom:8px"></select>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+              <div>
+                <label style="font-size:12px;color:#64748b;margin-bottom:4px;display:block">Quantidade</label>
+                <input type="number" id="promoQuantidadeMin" min="1" value="3">
+              </div>
+              <div>
+                <label style="font-size:12px;color:#64748b;margin-bottom:4px;display:block">Preço combo</label>
+                <input type="number" id="promoPrecoCombo" step="0.01" min="0" value="15">
+              </div>
+            </div>
+            <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#666;margin:8px 0">
+              <input type="checkbox" id="promoRepetirNaVenda" checked style="width:auto">
+              Aplicar repetidamente na mesma venda (6 itens = 2 combos)
+            </label>
+            <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#666;margin:8px 0">
+              <input type="checkbox" id="promoAtiva" checked style="width:auto">
+              Promoção ativa
+            </label>
+            <button id="btnSalvarPromocao" class="btn btn-primary btn-block" type="button">Salvar Promoção</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <div id="modalFechamentoVenda" class="modal" style="display:none">
+    <div class="modal-content" style="max-width:680px">
+      <div class="modal-header">
+        <h3>Fechamento da Comanda</h3>
+        <button id="btnFecharModalVenda" class="btn-fechar" type="button">x</button>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-group">
+          <label>Total bruto</label>
+          <div id="fechTotalBruto" class="display-value" style="height:44px;font-size:20px">R$ 0,00</div>
+        </div>
+        <div class="form-group">
+          <label>Total final</label>
+          <div id="fechTotalFinal" class="display-value" style="height:44px;font-size:20px">R$ 0,00</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px">
+        <div class="form-group">
+          <label for="fechDescontoTipo">Desconto</label>
+          <select id="fechDescontoTipo">
+            <option value="nenhum">Sem desconto</option>
+            <option value="percentual">Percentual (%)</option>
+            <option value="fixo">Valor fixo (R$)</option>
+            <option value="leve3pague2">3 por 2 (legado)</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label for="fechDescontoValor">Valor desconto</label>
+          <input id="fechDescontoValor" type="number" step="0.01" value="0">
+        </div>
+        <div class="form-group">
+          <label for="fechSplitMode">Divisão</label>
+          <select id="fechSplitMode">
+            <option value="nenhum">Sem divisão</option>
+            <option value="valor_igual">Dividir por valor</option>
+            <option value="por_item">Dividir por item</option>
+          </select>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-group">
+          <label for="fechFormaPagamento">Forma de pagamento</label>
+          <select id="fechFormaPagamento">
+            <option value="dinheiro">Dinheiro</option>
+            <option value="pix">PIX</option>
+            <option value="credito">Cartão Crédito</option>
+            <option value="debito">Cartão Débito</option>
+          </select>
+        </div>
+        <div class="form-group hidden" id="fechPessoasGroup">
+          <label for="fechPessoas">Pessoas</label>
+          <input id="fechPessoas" type="number" min="1" value="2">
+        </div>
+      </div>
+      <div id="fechItensSplitBox" class="hidden" style="border:1px solid #e2e8f0;border-radius:10px;padding:10px;background:#fff;margin-bottom:8px">
+        <div style="font-size:12px;font-weight:700;margin-bottom:6px">Divisão por item (pagamento parcial)</div>
+        <div id="fechItensSplitList" class="cart-section" style="max-height:160px"></div>
+        <div id="fechItensSplitTotal" style="margin-top:8px;font-size:12px;color:#0f172a;font-weight:700"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-group">
+          <label for="fechValorPago">Valor pago</label>
+          <input id="fechValorPago" type="number" step="0.01" min="0" value="0">
+        </div>
+        <div class="form-group">
+          <label>Troco</label>
+          <div id="fechTroco" class="display-value" style="height:44px;font-size:20px">R$ 0,00</div>
+        </div>
+      </div>
+      <div id="fechDivisaoPreview" class="cart-section" style="max-height:140px"></div>
+      <div id="fechPixBox" class="hidden" style="border:1px solid #e2e8f0;border-radius:10px;padding:10px;background:#f8fafc">
+        <div style="display:flex;gap:10px;align-items:flex-start">
+          <img id="fechPixQr" alt="QR PIX" style="width:140px;height:140px;border-radius:8px;border:1px solid #dbe3ef;background:#fff;object-fit:contain">
+          <div style="flex:1">
+            <div style="font-size:12px;font-weight:700;margin-bottom:4px">PIX copia e cola</div>
+            <textarea id="fechPixPayload" readonly style="min-height:120px"></textarea>
+          </div>
+        </div>
+      </div>
+      <div class="modal-acoes">
+        <button id="btnCalcularFechamento" class="btn btn-secondary" type="button">Concluir Cálculo</button>
+        <button id="btnConfirmarFechamento" class="btn btn-success" type="button">Confirmar Fechamento</button>
+      </div>
+    </div>
   </div>
 
   <script src="js/api.js"></script>

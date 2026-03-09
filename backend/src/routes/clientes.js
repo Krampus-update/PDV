@@ -6,6 +6,7 @@ const router = express.Router();
 router.use(authOptional, authRequired);
 
 router.get('/', ClienteController.listar);
+router.get('/:id/historico', ClienteController.historico);
 router.get('/:id', ClienteController.obter);
 router.post('/', ClienteController.criar);
 router.put('/:id', ClienteController.atualizar);

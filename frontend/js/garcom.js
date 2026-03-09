@@ -48,6 +48,17 @@ document.addEventListener('DOMContentLoaded', () => {
   let categoriaAtiva = 'todas';
   let refreshEmAndamento = false;
   const statusOrder = ['todas', 'em_preparo', 'pronta'];
+  const ui = window.PDVUI || {};
+  const uiNotify = (message, type = 'info') =>
+    ui.notify ? ui.notify({ title: 'Garçom', message, type, keepHistory: true }) : console.log(`[${type}] ${message}`);
+  const uiAlert = async (message, type = 'info') => {
+    if (ui.alert) return ui.alert(message, type, 'Garçom');
+    alert(message);
+  };
+  const uiConfirm = async (message, opts = {}) => {
+    if (ui.confirm) return ui.confirm(message, opts);
+    return confirm(message);
+  };
 
   function statusLabel(status) {
     if (status === 'em_preparo') return 'Preparando';
@@ -78,7 +89,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function showNotificacao(msg, tipo = 'success') {
-    console.log(`[${tipo.toUpperCase()}] ${msg}`);
+    uiNotify(msg, tipo);
   }
 
   function normalizarCategoria(v) {
@@ -103,21 +114,22 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  function opcoesParaTexto(opcoes) {
-    return opcoes.map((o, idx) => `${idx + 1}) ${o.nome} (${o.extra >= 0 ? '+' : ''}${formatarMoeda(o.extra)})`).join('\n');
-  }
-
-  function escolherOpcaoProduto(prod) {
+  async function escolherOpcaoProduto(prod) {
     const opcoes = parseOpcoesProduto(prod);
     if (!opcoes.length) return { observacoes: null, preco: Number(prod.preco || 0) };
-    const msg = `Escolha a variação de ${prod.nome}:\n${opcoesParaTexto(opcoes)}\n\nDigite o número da opção:`;
-    const resp = prompt(msg, '1');
-    if (resp === null) return null;
-    const idx = parseInt(String(resp).trim(), 10) - 1;
-    if (idx < 0 || idx >= opcoes.length) {
-      alert('Opção inválida');
-      return null;
-    }
+    const idx = ui.choose
+      ? await ui.choose({
+          title: `Variação - ${prod.nome}`,
+          message: 'Selecione a variação desejada.',
+          okLabel: 'Adicionar',
+          items: opcoes.map((o, index) => ({
+            value: index,
+            label: o.nome,
+            meta: `${o.extra >= 0 ? '+' : ''}${formatarMoeda(o.extra)}`
+          }))
+        })
+      : 0;
+    if (idx === null || idx === undefined || !opcoes[idx]) return null;
     const sel = opcoes[idx];
     return {
       observacoes: sel.nome,
@@ -215,7 +227,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!produto || Number(produto.estoque || 0) <= 0) return;
         if (!vendaAtiva) return;
         try {
-          const opcao = escolherOpcaoProduto(produto);
+          const opcao = await escolherOpcaoProduto(produto);
           if (opcao === null) return;
           await API.adicionarItem(vendaAtiva.id, produtoId, 1, {
             observacoes: opcao.observacoes || null,
@@ -226,7 +238,7 @@ document.addEventListener('DOMContentLoaded', () => {
           showNotificacao(`${produto.nome} adicionado`);
         } catch (err) {
           console.error('Erro ao adicionar item:', err);
-          alert(err.message || 'Erro ao adicionar item');
+          await uiAlert(err.message || 'Erro ao adicionar item', 'error');
         }
       });
     });
@@ -337,7 +349,7 @@ document.addEventListener('DOMContentLoaded', () => {
       itemEmEdicao = null;
     } catch (e) {
       console.error('Erro ao atualizar quantidade', e);
-      alert('Erro ao atualizar quantidade');
+      await uiAlert('Erro ao atualizar quantidade', 'error');
     }
   }
 
@@ -350,7 +362,7 @@ document.addEventListener('DOMContentLoaded', () => {
   async function adicionarAvulsoComandaAtiva() {
     if (!vendaAtiva) return;
     const valor = tecladoAvulso && tecladoAvulso.getValue();
-    if (valor === null || valor <= 0) return alert('Valor inválido');
+    if (valor === null || valor <= 0) return uiAlert('Valor inválido', 'warning');
     try {
       const temp = await API.criarProduto({
         nome: `Avulso R$ ${valor.toFixed(2)} #${Date.now()}`,
@@ -377,7 +389,7 @@ document.addEventListener('DOMContentLoaded', () => {
       showNotificacao('Valor avulso adicionado');
     } catch (e) {
       console.error('Erro ao adicionar avulso', e);
-      alert('Erro ao adicionar valor avulso');
+      await uiAlert('Erro ao adicionar valor avulso', 'error');
     }
   }
 
@@ -422,7 +434,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   btnRemoverItemQtd.addEventListener('click', async () => {
     if (!itemEmEdicao) return;
-    if (!confirm('Remover item da comanda?')) return;
+    if (!(await uiConfirm('Remover item da comanda?', { title: 'Confirmar remoção' }))) return;
     try {
       await API.removerItem(itemEmEdicao.vendaId, itemEmEdicao.itemId);
       await refreshDados();
@@ -431,7 +443,7 @@ document.addEventListener('DOMContentLoaded', () => {
       itemEmEdicao = null;
     } catch (e) {
       console.error('Erro ao remover item', e);
-      alert('Erro ao remover item');
+      await uiAlert('Erro ao remover item', 'error');
     }
   });
 
@@ -452,7 +464,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('btnNovaComanda').addEventListener('click', async () => {
     try {
-      let mesa = prompt('Número da mesa (ou deixe em branco para balcão)');
+      let mesa = ui.prompt
+        ? await ui.prompt({
+            title: 'Nova comanda',
+            message: 'Número da mesa (deixe em branco para balcão).',
+            placeholder: 'Ex: 12',
+            value: ''
+          })
+        : '';
       if (mesa === null) return;
       mesa = mesa.trim();
       const mesaParam = mesa || 'balcao';
@@ -481,13 +500,13 @@ document.addEventListener('DOMContentLoaded', () => {
       showNotificacao('Último item removido');
     } catch (err) {
       console.error('Erro ao remover item:', err);
-      alert('Erro ao remover item');
+      await uiAlert('Erro ao remover item', 'error');
     }
   });
 
   btnFecharComanda.addEventListener('click', async () => {
     if (!vendaAtiva) return;
-    if (!confirm('Finalizar comanda agora?')) return;
+    if (!(await uiConfirm('Finalizar comanda agora?', { title: 'Finalizar comanda' }))) return;
     try {
       await API.fecharVenda(vendaAtiva.id, 'dinheiro');
       modal.style.display = 'none';
@@ -496,7 +515,7 @@ document.addEventListener('DOMContentLoaded', () => {
       showNotificacao('Comanda finalizada');
     } catch (err) {
       console.error('Erro ao finalizar comanda:', err);
-      alert('Erro ao finalizar comanda');
+      await uiAlert('Erro ao finalizar comanda', 'error');
     }
   });
 

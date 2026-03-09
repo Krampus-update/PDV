@@ -1,10 +1,24 @@
 // Tela de Produção (cozinha): mostra apenas itens marcados para cozinha.
 
 document.addEventListener('DOMContentLoaded', () => {
+  const ui = window.PDVUI || {};
+  const uiAlert = async (message, type = 'info') => {
+    if (ui.alert) return ui.alert(message, type, 'Produção');
+    alert(message);
+  };
+  const uiNotify = (message, type = 'success') => {
+    if (ui.notify) {
+      ui.notify({ title: 'Produção', message, type, keepHistory: true });
+    } else {
+      console.log(`[${type}] ${message}`);
+    }
+  };
   const gridPedidos = document.getElementById('gridPedidos');
   const btnRecarregar = document.getElementById('btnRecarregar');
   const totalEmPreparo = document.getElementById('totalEmPreparo');
   const totalProntos = document.getElementById('totalProntos');
+  const buscaPedido = document.getElementById('buscaPedido');
+  const filtroTipoPedido = document.getElementById('filtroTipoPedido');
 
   const modal = document.getElementById('modalDetalhes');
   const btnFecharModal = document.getElementById('btnFecharModal');
@@ -20,6 +34,8 @@ document.addEventListener('DOMContentLoaded', () => {
   let pedidos = [];
   let pedidoAtivo = null;
   let statusAtivo = 'em_preparo';
+  let buscaTermo = '';
+  let filtroTipo = 'todos';
   let refreshRodando = false;
   let idsEmPreparo = new Set();
 
@@ -61,12 +77,21 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function renderizarPedidos() {
-    if (!pedidos || pedidos.length === 0) {
+    const filtrados = (pedidos || []).filter((p) => {
+      const termo = String(buscaTermo || '').toLowerCase().trim();
+      const titulo = tituloComanda(p).toLowerCase();
+      const itensTxt = (p.itens || []).map((i) => String(i.produto_nome || '').toLowerCase()).join(' ');
+      const isMesa = !!String(p.mesa || '').trim();
+      const tipoOk = filtroTipo === 'todos' ? true : filtroTipo === 'mesa' ? isMesa : !isMesa;
+      const buscaOk = !termo || titulo.includes(termo) || itensTxt.includes(termo) || String(p.id || '').includes(termo);
+      return tipoOk && buscaOk;
+    });
+    if (!filtrados.length) {
       gridPedidos.innerHTML = `<p class="placeholder">Nenhum pedido ${statusAtivo === 'em_preparo' ? 'em preparo' : 'pronto'} para cozinha</p>`;
       return;
     }
 
-    gridPedidos.innerHTML = pedidos
+    gridPedidos.innerHTML = filtrados
       .map((p) => {
         const itens = (p.itens || []).filter((i) => Number(i.produto_vai_cozinha) === 1);
         const itensPreview = itens
@@ -144,7 +169,7 @@ document.addEventListener('DOMContentLoaded', () => {
       showNotificacao('Pedido marcado como pronto');
     } catch (err) {
       console.error('Erro ao marcar pronto:', err);
-      alert(err.message || 'Erro ao marcar como pronto');
+      await uiAlert(err.message || 'Erro ao marcar como pronto', 'error');
     }
   }
 
@@ -159,7 +184,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function showNotificacao(msg) {
-    console.log(`[INFO] ${msg}`);
+    uiNotify(msg, 'success');
   }
 
   async function refreshGeral() {
@@ -196,6 +221,18 @@ document.addEventListener('DOMContentLoaded', () => {
   btnFecharModal.addEventListener('click', () => (modal.style.display = 'none'));
   btnCancelarDetalhes.addEventListener('click', () => (modal.style.display = 'none'));
   btnRecarregar.addEventListener('click', () => refreshGeral());
+  if (buscaPedido) {
+    buscaPedido.addEventListener('input', () => {
+      buscaTermo = buscaPedido.value || '';
+      renderizarPedidos();
+    });
+  }
+  if (filtroTipoPedido) {
+    filtroTipoPedido.addEventListener('change', () => {
+      filtroTipo = filtroTipoPedido.value || 'todos';
+      renderizarPedidos();
+    });
+  }
 
   document.querySelectorAll('.aba').forEach((aba) => {
     aba.addEventListener('click', async () => {

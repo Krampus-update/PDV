@@ -145,6 +145,8 @@ function tenantSchemaQueries() {
       destaque BOOLEAN DEFAULT 0,
       popularidade INTEGER NOT NULL DEFAULT 0,
       opcoes_json TEXT,
+      promocao_tipo TEXT DEFAULT 'nenhuma',
+      promocao_param_json TEXT,
       vai_cozinha BOOLEAN DEFAULT 0,
       imagem TEXT,
       ativo BOOLEAN DEFAULT 1,
@@ -157,6 +159,22 @@ function tenantSchemaQueries() {
       status TEXT NOT NULL CHECK(status IN ('aberta', 'em_preparo', 'pronta', 'fechada')) DEFAULT 'aberta',
       numero_pedido INTEGER,
       mesa TEXT,
+      cliente_id INTEGER,
+      caixa_sessao_id INTEGER,
+      subtotal_bruto DECIMAL(10, 2) NOT NULL DEFAULT 0,
+      desconto_tipo TEXT,
+      desconto_valor DECIMAL(10,2) NOT NULL DEFAULT 0,
+      desconto_descricao TEXT,
+      acrescimo_valor DECIMAL(10,2) NOT NULL DEFAULT 0,
+      valor_pago DECIMAL(10,2),
+      troco_valor DECIMAL(10,2),
+      split_mode TEXT,
+      split_payload_json TEXT,
+      pagamento_provider TEXT,
+      pagamento_status TEXT,
+      pagamento_transacao_id TEXT,
+      pix_payload TEXT,
+      pix_chave_utilizada TEXT,
       total DECIMAL(10, 2) NOT NULL DEFAULT 0,
       forma_pagamento TEXT,
       observacoes TEXT,
@@ -225,6 +243,36 @@ function tenantSchemaQueries() {
       chave TEXT PRIMARY KEY,
       valor TEXT,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`,
+    `CREATE TABLE IF NOT EXISTS promocoes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nome TEXT NOT NULL,
+      descricao TEXT,
+      tipo TEXT NOT NULL DEFAULT 'combo_produto',
+      produto_id INTEGER,
+      quantidade_min INTEGER NOT NULL DEFAULT 0,
+      repetir_na_venda BOOLEAN DEFAULT 1,
+      preco_combo DECIMAL(10,2),
+      desconto_percentual DECIMAL(10,2),
+      desconto_fixo DECIMAL(10,2),
+      data_inicio DATETIME,
+      data_fim DATETIME,
+      ativo BOOLEAN DEFAULT 1,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (produto_id) REFERENCES produtos(id)
+    )`,
+    `CREATE TABLE IF NOT EXISTS caixa_sessoes (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      aberto_por INTEGER,
+      fechado_por INTEGER,
+      saldo_inicial DECIMAL(10,2) NOT NULL DEFAULT 0,
+      saldo_final_informado DECIMAL(10,2),
+      total_vendas DECIMAL(10,2) NOT NULL DEFAULT 0,
+      total_comandas INTEGER NOT NULL DEFAULT 0,
+      observacoes TEXT,
+      aberto_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      fechado_em DATETIME
     )`
   ];
 }
@@ -297,6 +345,61 @@ async function initializeTenantDatabase(code) {
   if (!cols.some((c) => c.name === 'mesa')) {
     await runQuery(db, 'ALTER TABLE vendas ADD COLUMN mesa TEXT');
   }
+  if (!cols.some((c) => c.name === 'cliente_id')) {
+    await runQuery(db, 'ALTER TABLE vendas ADD COLUMN cliente_id INTEGER');
+  }
+  if (!cols.some((c) => c.name === 'caixa_sessao_id')) {
+    await runQuery(db, 'ALTER TABLE vendas ADD COLUMN caixa_sessao_id INTEGER');
+  }
+  if (!cols.some((c) => c.name === 'subtotal_bruto')) {
+    await runQuery(db, 'ALTER TABLE vendas ADD COLUMN subtotal_bruto DECIMAL(10,2) NOT NULL DEFAULT 0');
+  }
+  if (!cols.some((c) => c.name === 'desconto_tipo')) {
+    await runQuery(db, 'ALTER TABLE vendas ADD COLUMN desconto_tipo TEXT');
+  }
+  if (!cols.some((c) => c.name === 'desconto_valor')) {
+    await runQuery(db, 'ALTER TABLE vendas ADD COLUMN desconto_valor DECIMAL(10,2) NOT NULL DEFAULT 0');
+  }
+  if (!cols.some((c) => c.name === 'desconto_descricao')) {
+    await runQuery(db, 'ALTER TABLE vendas ADD COLUMN desconto_descricao TEXT');
+  }
+  if (!cols.some((c) => c.name === 'acrescimo_valor')) {
+    await runQuery(db, 'ALTER TABLE vendas ADD COLUMN acrescimo_valor DECIMAL(10,2) NOT NULL DEFAULT 0');
+  }
+  if (!cols.some((c) => c.name === 'valor_pago')) {
+    await runQuery(db, 'ALTER TABLE vendas ADD COLUMN valor_pago DECIMAL(10,2)');
+  }
+  if (!cols.some((c) => c.name === 'troco_valor')) {
+    await runQuery(db, 'ALTER TABLE vendas ADD COLUMN troco_valor DECIMAL(10,2)');
+  }
+  if (!cols.some((c) => c.name === 'split_mode')) {
+    await runQuery(db, 'ALTER TABLE vendas ADD COLUMN split_mode TEXT');
+  }
+  if (!cols.some((c) => c.name === 'split_payload_json')) {
+    await runQuery(db, 'ALTER TABLE vendas ADD COLUMN split_payload_json TEXT');
+  }
+  if (!cols.some((c) => c.name === 'pagamento_provider')) {
+    await runQuery(db, 'ALTER TABLE vendas ADD COLUMN pagamento_provider TEXT');
+  }
+  if (!cols.some((c) => c.name === 'pagamento_status')) {
+    await runQuery(db, 'ALTER TABLE vendas ADD COLUMN pagamento_status TEXT');
+  }
+  if (!cols.some((c) => c.name === 'pagamento_transacao_id')) {
+    await runQuery(db, 'ALTER TABLE vendas ADD COLUMN pagamento_transacao_id TEXT');
+  }
+  if (!cols.some((c) => c.name === 'pix_payload')) {
+    await runQuery(db, 'ALTER TABLE vendas ADD COLUMN pix_payload TEXT');
+  }
+  if (!cols.some((c) => c.name === 'pix_chave_utilizada')) {
+    await runQuery(db, 'ALTER TABLE vendas ADD COLUMN pix_chave_utilizada TEXT');
+  }
+  if (!cols.some((c) => c.name === 'promocao_aplicada_id')) {
+    await runQuery(db, 'ALTER TABLE vendas ADD COLUMN promocao_aplicada_id INTEGER');
+  }
+  const promoCols = await dbAll("PRAGMA table_info(promocoes)", [], code);
+  if (!promoCols.some((c) => c.name === 'repetir_na_venda')) {
+    await runQuery(db, 'ALTER TABLE promocoes ADD COLUMN repetir_na_venda BOOLEAN DEFAULT 1');
+  }
   const prodCols = await dbAll("PRAGMA table_info(produtos)", [], code);
   if (!prodCols.some((c) => c.name === 'imagem')) {
     await runQuery(db, 'ALTER TABLE produtos ADD COLUMN imagem TEXT');
@@ -316,11 +419,20 @@ async function initializeTenantDatabase(code) {
   if (!prodCols.some((c) => c.name === 'opcoes_json')) {
     await runQuery(db, 'ALTER TABLE produtos ADD COLUMN opcoes_json TEXT');
   }
+  if (!prodCols.some((c) => c.name === 'promocao_tipo')) {
+    await runQuery(db, "ALTER TABLE produtos ADD COLUMN promocao_tipo TEXT DEFAULT 'nenhuma'");
+  }
+  if (!prodCols.some((c) => c.name === 'promocao_param_json')) {
+    await runQuery(db, 'ALTER TABLE produtos ADD COLUMN promocao_param_json TEXT');
+  }
 
   const indexQueries = [
     'CREATE INDEX IF NOT EXISTS idx_vendas_tipo ON vendas(tipo)',
     'CREATE INDEX IF NOT EXISTS idx_vendas_status ON vendas(status)',
     'CREATE INDEX IF NOT EXISTS idx_vendas_created_at ON vendas(created_at)',
+    'CREATE INDEX IF NOT EXISTS idx_vendas_cliente_id ON vendas(cliente_id)',
+    'CREATE INDEX IF NOT EXISTS idx_vendas_caixa_sessao_id ON vendas(caixa_sessao_id)',
+    'CREATE INDEX IF NOT EXISTS idx_vendas_promocao_aplicada_id ON vendas(promocao_aplicada_id)',
     'CREATE INDEX IF NOT EXISTS idx_venda_itens_venda_id ON venda_itens(venda_id)',
     'CREATE INDEX IF NOT EXISTS idx_ficha_tecnica_produto_id ON ficha_tecnica(produto_id)',
     'CREATE INDEX IF NOT EXISTS idx_historico_entidade ON historico_transacoes(tipo_entidade, entidade_id)',
@@ -329,7 +441,11 @@ async function initializeTenantDatabase(code) {
     'CREATE INDEX IF NOT EXISTS idx_clientes_telefone ON clientes(telefone)',
     'CREATE INDEX IF NOT EXISTS idx_usuarios_login ON usuarios(login)',
     'CREATE INDEX IF NOT EXISTS idx_sessoes_token ON sessoes(token)',
-    'CREATE INDEX IF NOT EXISTS idx_sessoes_expires ON sessoes(expires_at)'
+    'CREATE INDEX IF NOT EXISTS idx_sessoes_expires ON sessoes(expires_at)',
+    'CREATE INDEX IF NOT EXISTS idx_caixa_aberto_em ON caixa_sessoes(aberto_em)',
+    'CREATE INDEX IF NOT EXISTS idx_caixa_fechado_em ON caixa_sessoes(fechado_em)',
+    'CREATE INDEX IF NOT EXISTS idx_promocoes_ativo ON promocoes(ativo)',
+    'CREATE INDEX IF NOT EXISTS idx_promocoes_produto_id ON promocoes(produto_id)'
   ];
   for (const query of indexQueries) await runQuery(db, query);
 

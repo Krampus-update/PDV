@@ -154,6 +154,10 @@ class API {
         return this.request('POST', '/vendas', { tipo, mesa });
     }
 
+    static async criarVendaComCliente(tipo, mesa = null, cliente_id = null) {
+        return this.request('POST', '/vendas', { tipo, mesa, cliente_id });
+    }
+
     static async obterVenda(id) {
         return this.request('GET', `/vendas/${id}`);
     }
@@ -170,6 +174,24 @@ class API {
     static async obterVendasAbertas(tipo = null) {
         const query = tipo ? `?tipo=${tipo}` : '';
         return this.request('GET', `/vendas/abertas${query}`);
+    }
+
+    // ===== CAIXA =====
+    static async obterCaixaAtual() {
+        return this.request('GET', '/caixa/atual');
+    }
+
+    static async abrirCaixa(saldo_inicial = 0) {
+        return this.request('POST', '/caixa/abrir', { saldo_inicial });
+    }
+
+    static async fecharCaixa(saldo_final = null, observacoes = '') {
+        return this.request('POST', '/caixa/fechar', { saldo_final, observacoes });
+    }
+
+    static async obterResumoDiaCaixa(data = null) {
+        const query = data ? `?data=${encodeURIComponent(data)}` : '';
+        return this.request('GET', `/caixa/resumo-dia${query}`);
     }
 
     static async obterEmPreparo() {
@@ -222,6 +244,10 @@ class API {
         return this.request('DELETE', `/clientes/${id}`);
     }
 
+    static async obterHistoricoCliente(id, limite = 30) {
+        return this.request('GET', `/clientes/${id}/historico?limite=${encodeURIComponent(limite)}`);
+    }
+
     // ===== ITENS DA VENDA =====
     static async adicionarItem(vendaId, produtoId, quantidade, extras = {}) {
         return this.request('POST', `/vendas/${vendaId}/itens`, {
@@ -242,10 +268,11 @@ class API {
     }
 
     // ===== OPERAÇÕES NA VENDA =====
-    static async fecharVenda(vendaId, formaPagamento, observacoes = '') {
+    static async fecharVenda(vendaId, formaPagamento, observacoes = '', extras = {}) {
         return this.request('PUT', `/vendas/${vendaId}/fechar`, {
             forma_pagamento: formaPagamento,
-            observacoes
+            observacoes,
+            ...extras
         });
     }
 
@@ -257,6 +284,70 @@ class API {
         return this.request('PUT', `/vendas/${vendaId}/status`, {
             status
         });
+    }
+
+    static async vincularClienteVenda(vendaId, cliente_id = null) {
+        return this.request('PUT', `/vendas/${vendaId}/cliente`, { cliente_id });
+    }
+
+    static async reabrirVenda(vendaId) {
+        return this.request('PUT', `/vendas/${vendaId}/reabrir`);
+    }
+
+    static async aplicarFinanceiroVenda(vendaId, dados) {
+        return this.request('PUT', `/vendas/${vendaId}/financeiro`, dados || {});
+    }
+
+    static async simularDivisaoVenda(vendaId, modo = 'valor_igual', pessoas = 2) {
+        return this.request('POST', `/vendas/${vendaId}/divisao`, { modo, pessoas });
+    }
+
+    // ===== PIX =====
+    static async obterConfigPix() {
+        return this.request('GET', '/pix/config');
+    }
+
+    static async salvarConfigPix(dados) {
+        return this.request('PUT', '/pix/config', dados || {});
+    }
+
+    static async gerarPixVenda(vendaId, valor = 0, descricao = '') {
+        return this.request('POST', `/pix/venda/${vendaId}/gerar`, { valor, descricao });
+    }
+
+    // ===== PAGAMENTOS =====
+    static async obterProvidersPagamento() {
+        return this.request('GET', '/pagamentos/providers');
+    }
+
+    static async obterConfigPagamento() {
+        return this.request('GET', '/pagamentos/config');
+    }
+
+    static async salvarConfigPagamento(dados) {
+        return this.request('PUT', '/pagamentos/config', dados || {});
+    }
+
+    static async processarPagamento(dados) {
+        return this.request('POST', '/pagamentos/processar', dados || {});
+    }
+
+    // ===== PROMOÇÕES =====
+    static async obterPromocoes(ativo = null) {
+        const query = ativo === null ? '' : `?ativo=${ativo ? 1 : 0}`;
+        return this.request('GET', `/promocoes${query}`);
+    }
+
+    static async criarPromocao(dados) {
+        return this.request('POST', '/promocoes', dados || {});
+    }
+
+    static async atualizarPromocao(id, dados) {
+        return this.request('PUT', `/promocoes/${id}`, dados || {});
+    }
+
+    static async removerPromocao(id) {
+        return this.request('DELETE', `/promocoes/${id}`);
     }
 
     // ===== HEALTH CHECK =====

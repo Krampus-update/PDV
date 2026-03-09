@@ -12,9 +12,10 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById(target).classList.remove('hidden');
     if (target === 'mesas') carregarMesas();
     if (target === 'clientes') carregarClientes();
+    if (target === 'promocoes') carregarPromocoes();
   }
 
-  if (tabViaQuery && ['home', 'produtos', 'mesas', 'clientes'].includes(tabViaQuery)) {
+  if (tabViaQuery && ['home', 'produtos', 'mesas', 'clientes', 'promocoes'].includes(tabViaQuery)) {
     const alvo = document.querySelector(`.tab[data-target="${tabViaQuery}"]`);
     if (alvo) alvo.click();
   }
@@ -54,9 +55,230 @@ document.addEventListener('DOMContentLoaded', () => {
       carregarMesas();
     });
   }
+  const caixaStatusTagEl = document.getElementById('caixaStatusTag');
+  const caixaInfoResumoEl = document.getElementById('caixaInfoResumo');
+  const btnAbrirCaixaEl = document.getElementById('btnAbrirCaixa');
+  const btnFecharCaixaEl = document.getElementById('btnFecharCaixa');
+  let filtroProdutoEstoque = '';
+  const buscaProdutoEstoqueEl = document.getElementById('buscaProdutoEstoque');
+  if (buscaProdutoEstoqueEl) {
+    buscaProdutoEstoqueEl.addEventListener('input', () => {
+      filtroProdutoEstoque = String(buscaProdutoEstoqueEl.value || '').toLowerCase().trim();
+      renderProdutosList(produtosCache);
+    });
+  }
   const btnAddVariacao = document.getElementById('btnAddVariacao');
   if (btnAddVariacao) {
     btnAddVariacao.addEventListener('click', () => adicionarLinhaVariacao('', 0));
+  }
+
+  async function carregarCaixaResumo() {
+    if (!caixaStatusTagEl || !caixaInfoResumoEl) return;
+    try {
+      const [{ aberto }, resumoDia] = await Promise.all([API.obterCaixaAtual(), API.obterResumoDiaCaixa()]);
+      caixaAtual = aberto || null;
+      if (caixaAtual) {
+        caixaStatusTagEl.className = 'status-badge aberta';
+        caixaStatusTagEl.textContent = 'Caixa aberto';
+        caixaInfoResumoEl.textContent = `Abertura: ${new Date(caixaAtual.aberto_em).toLocaleString('pt-BR')} • Dia: ${resumoDia.total_comandas || 0} comandas • ${formatarMoedaBR(resumoDia.faturamento_fechadas || 0)}`;
+      } else {
+        caixaStatusTagEl.className = 'status-badge fechada';
+        caixaStatusTagEl.textContent = 'Caixa fechado';
+        caixaInfoResumoEl.textContent = `Dia: ${resumoDia.total_comandas || 0} comandas • ${formatarMoedaBR(resumoDia.faturamento_fechadas || 0)}`;
+      }
+      if (btnAbrirCaixaEl) btnAbrirCaixaEl.disabled = !!caixaAtual;
+      if (btnFecharCaixaEl) btnFecharCaixaEl.disabled = !caixaAtual;
+    } catch (e) {
+      console.error('Erro ao carregar caixa', e);
+      caixaInfoResumoEl.textContent = 'Falha ao carregar caixa.';
+    }
+  }
+
+  if (btnAbrirCaixaEl) {
+    btnAbrirCaixaEl.addEventListener('click', async () => {
+      const entrada = ui.prompt
+        ? await ui.prompt({
+            title: 'Abrir caixa',
+            message: 'Informe o saldo inicial (opcional).',
+            placeholder: '0,00',
+            value: '0,00',
+            okLabel: 'Abrir'
+          })
+        : '0';
+      if (entrada === null) return;
+      const saldo = Number.parseFloat(String(entrada || '0').replace(',', '.')) || 0;
+      try {
+        await API.abrirCaixa(saldo);
+        uiNotify(`Caixa aberto com saldo inicial ${formatarMoedaBR(saldo)}`, 'success');
+        await carregarCaixaResumo();
+      } catch (e) {
+        await uiAlert(e.message || 'Erro ao abrir caixa', 'error');
+      }
+    });
+  }
+
+  if (btnFecharCaixaEl) {
+    btnFecharCaixaEl.addEventListener('click', async () => {
+      if (!caixaAtual) return;
+      const entrada = ui.prompt
+        ? await ui.prompt({
+            title: 'Fechar caixa',
+            message: 'Informe o saldo final contado (opcional).',
+            placeholder: '0,00',
+            value: '',
+            okLabel: 'Fechar'
+          })
+        : '';
+      if (entrada === null) return;
+      if (!(await uiConfirm('Confirmar fechamento de caixa?', { title: 'Fechar caixa' }))) return;
+      const saldoFinal = String(entrada || '').trim()
+        ? Number.parseFloat(String(entrada).replace(',', '.')) || 0
+        : null;
+      try {
+        const fechado = await API.fecharCaixa(saldoFinal, '');
+        uiNotify(
+          `Caixa fechado: ${fechado.total_comandas || 0} comandas • ${formatarMoedaBR(fechado.total_vendas || 0)}`,
+          'success'
+        );
+        await carregarCaixaResumo();
+      } catch (e) {
+        await uiAlert(e.message || 'Erro ao fechar caixa', 'error');
+      }
+    });
+  }
+
+  function abrirModalFechamento() {
+    if (!modalFechamentoVenda || !currentMesa) return;
+    const bruto = Number(currentMesa.subtotal_bruto || currentMesa.total || 0);
+    const total = Number(currentMesa.total || 0);
+    splitPayloadAtual = null;
+    if (fechTotalBruto) fechTotalBruto.textContent = formatarMoedaBR(bruto);
+    if (fechTotalFinal) fechTotalFinal.textContent = formatarMoedaBR(total);
+    if (fechTroco) fechTroco.textContent = formatarMoedaBR(0);
+    if (fechDescontoTipo) fechDescontoTipo.value = String(currentMesa.desconto_tipo || 'nenhum');
+    if (fechDescontoValor) fechDescontoValor.value = Number(currentMesa.desconto_valor || 0);
+    if (fechSplitMode) fechSplitMode.value = String(currentMesa.split_mode || 'nenhum');
+    if (fechValorPago) fechValorPago.value = Number(currentMesa.valor_pago || 0);
+    if (fechPessoas) fechPessoas.value = '2';
+    if (fechFormaPagamento) fechFormaPagamento.value = 'dinheiro';
+    atualizarVisibilidadeDesconto();
+    atualizarVisibilidadeDivisao();
+    if (fechDivisaoPreview) fechDivisaoPreview.innerHTML = '<p style="font-size:12px;color:#64748b">Clique em Calcular para simular divisão.</p>';
+    if (fechPixBox) fechPixBox.classList.add('hidden');
+    if (fechPixQr) fechPixQr.src = '';
+    if (fechPixPayload) fechPixPayload.value = '';
+    if ((fechSplitMode?.value || '') === 'por_item') {
+      if (fechValorPago) fechValorPago.value = String(totalSelecionadoSplitPorItem() || 0);
+    }
+    modalFechamentoVenda.style.display = 'flex';
+  }
+
+  function fecharModalFechamento() {
+    if (!modalFechamentoVenda) return;
+    modalFechamentoVenda.style.display = 'none';
+  }
+
+  async function calcularFechamento() {
+    if (!currentMesa) return;
+    const descontoTipo = fechDescontoTipo?.value || 'nenhum';
+    const descontoValor = Number.parseFloat(String(fechDescontoValor?.value || '0').replace(',', '.')) || 0;
+    const splitMode = fechSplitMode?.value || 'nenhum';
+    const pessoas = Math.max(1, Number(fechPessoas?.value || 1));
+    if (splitMode === 'por_item' && !splitPayloadAtual) {
+      splitPayloadAtual = { itens: [] };
+      renderSplitPorItemEditor();
+    }
+    const splitPayload = splitMode === 'por_item' ? splitPayloadAtual : null;
+    const valorPago = Number.parseFloat(String(fechValorPago?.value || '0').replace(',', '.')) || 0;
+
+    await API.aplicarFinanceiroVenda(currentMesa.id, {
+      desconto_tipo: descontoTipo,
+      desconto_valor: descontoValor,
+      split_mode: splitMode === 'nenhum' ? null : splitMode,
+      split_payload_json: splitPayload
+    });
+    const venda = await API.obterVenda(currentMesa.id);
+    currentMesa = venda;
+    if (fechTotalBruto) fechTotalBruto.textContent = formatarMoedaBR(Number(venda.subtotal_bruto || venda.total || 0));
+    if (fechTotalFinal) fechTotalFinal.textContent = formatarMoedaBR(Number(venda.total || 0));
+    const troco = Math.max(0, valorPago - Number(venda.total || 0));
+    if (fechTroco) fechTroco.textContent = formatarMoedaBR(troco);
+
+    if (splitMode !== 'nenhum') {
+      if (splitMode === 'valor_igual') {
+        const div = await API.simularDivisaoVenda(currentMesa.id, splitMode, pessoas);
+        if (fechDivisaoPreview) {
+          fechDivisaoPreview.innerHTML = (div.parcelas || [])
+            .map((p) => `<div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #e2e8f0;font-size:12px"><span>Pessoa ${p.pessoa}</span><strong>${formatarMoedaBR(p.valor || p.total || 0)}</strong></div>`)
+            .join('');
+        }
+      } else {
+        renderSplitPorItemEditor();
+        if (fechDivisaoPreview) {
+          const selecionado = totalSelecionadoSplitPorItem();
+          const restante = Math.max(0, Number((Number(venda.total || 0) - selecionado).toFixed(2)));
+          fechDivisaoPreview.innerHTML = `
+            <div style="display:flex;justify-content:space-between;padding:4px 0;border-bottom:1px solid #e2e8f0;font-size:12px">
+              <span>Pagamento desta divisão</span><strong>${formatarMoedaBR(selecionado)}</strong>
+            </div>
+            <div style="display:flex;justify-content:space-between;padding:4px 0;font-size:12px">
+              <span>Saldo restante</span><strong>${formatarMoedaBR(restante)}</strong>
+            </div>`;
+        }
+      }
+    } else if (fechDivisaoPreview) {
+      fechDivisaoPreview.innerHTML = '<p style="font-size:12px;color:#64748b">Sem divisão.</p>';
+    }
+
+    if ((fechFormaPagamento?.value || '') === 'pix') {
+      try {
+        const pix = await API.gerarPixVenda(currentMesa.id, Number(venda.total || 0), `Comanda ${currentMesa.id}`);
+        if (fechPixBox) fechPixBox.classList.remove('hidden');
+        if (fechPixQr) fechPixQr.src = pix.qr_data_url || '';
+        if (fechPixPayload) fechPixPayload.value = pix.copia_cola || pix.payload || '';
+      } catch (e) {
+        if (fechPixBox) fechPixBox.classList.add('hidden');
+        uiNotify(e.message || 'PIX não configurado', 'warning');
+      }
+    } else if (fechPixBox) {
+      fechPixBox.classList.add('hidden');
+    }
+  }
+
+  async function confirmarFechamentoVenda() {
+    if (!currentMesa) return;
+    const forma = fechFormaPagamento?.value || 'dinheiro';
+    const valorPago = Number.parseFloat(String(fechValorPago?.value || '0').replace(',', '.')) || 0;
+
+    if (!(await uiConfirm('Confirmar fechamento da comanda?', { title: 'Fechar comanda' }))) return;
+
+    const fechamento = await API.fecharVenda(currentMesa.id, forma, '', {
+      valor_pago: valorPago,
+      pagamento_provider: null,
+      pix_gerar: forma === 'pix'
+    });
+    if (fechamento?.parcial) {
+      uiNotify(`Pagamento parcial registrado: ${formatarMoedaBR(fechamento.valor_pago_parcial || 0)}`, 'success');
+      fecharModalFechamento();
+      await carregarMesas();
+      if (currentMesa) {
+        const updated = await API.obterVenda(currentMesa.id);
+        currentMesa = updated;
+        renderSideMesa(updated);
+      }
+      await carregarProdutosCompleto();
+      await carregarCaixaResumo();
+      return;
+    }
+    uiNotify('Comanda fechada', 'success');
+    fecharModalFechamento();
+    document.getElementById('sideMesas').innerHTML = '<p style="color:#999;font-size:12px">Selecione uma comanda à esquerda</p>';
+    currentMesa = null;
+    vendaAtual = null;
+    localStorage.removeItem('vendaAtual');
+    await carregarMesas();
+    await carregarProdutosCompleto();
+    await carregarCaixaResumo();
   }
 
   let carrinho = [];
@@ -69,6 +291,167 @@ document.addEventListener('DOMContentLoaded', () => {
   let abrindoComanda = false;
   let mesaTeclado = null;
   let refreshEmAndamento = false;
+  let caixaAtual = null;
+  let promocoesCache = [];
+  let promocaoEmEdicaoId = null;
+  let splitPayloadAtual = null;
+
+  const ui = window.PDVUI || {};
+  const uiNotify = (message, type = 'info', title = 'Aviso') =>
+    ui.notify ? ui.notify({ title, message, type, keepHistory: true }) : console.log(`[${type}] ${message}`);
+  const uiAlert = async (message, type = 'info', title = 'Aviso') => {
+    if (ui.alert) return ui.alert(message, type, title);
+    alert(message);
+  };
+  const uiConfirm = async (message, opts = {}) => {
+    if (ui.confirm) return ui.confirm(message, opts);
+    return confirm(message);
+  };
+  const modalFechamentoVenda = document.getElementById('modalFechamentoVenda');
+  const btnFecharModalVenda = document.getElementById('btnFecharModalVenda');
+  const btnCalcularFechamento = document.getElementById('btnCalcularFechamento');
+  const btnConfirmarFechamento = document.getElementById('btnConfirmarFechamento');
+  const fechTotalBruto = document.getElementById('fechTotalBruto');
+  const fechTotalFinal = document.getElementById('fechTotalFinal');
+  const fechTroco = document.getElementById('fechTroco');
+  const fechDescontoTipo = document.getElementById('fechDescontoTipo');
+  const fechDescontoValor = document.getElementById('fechDescontoValor');
+  const fechSplitMode = document.getElementById('fechSplitMode');
+  const fechPessoasGroup = document.getElementById('fechPessoasGroup');
+  const fechPessoas = document.getElementById('fechPessoas');
+  const fechItensSplitBox = document.getElementById('fechItensSplitBox');
+  const fechItensSplitList = document.getElementById('fechItensSplitList');
+  const fechItensSplitTotal = document.getElementById('fechItensSplitTotal');
+  const fechFormaPagamento = document.getElementById('fechFormaPagamento');
+  const fechValorPago = document.getElementById('fechValorPago');
+  const fechDivisaoPreview = document.getElementById('fechDivisaoPreview');
+  const fechPixBox = document.getElementById('fechPixBox');
+  const fechPixQr = document.getElementById('fechPixQr');
+  const fechPixPayload = document.getElementById('fechPixPayload');
+
+  btnFecharModalVenda?.addEventListener('click', fecharModalFechamento);
+  btnCalcularFechamento?.addEventListener('click', async () => {
+    try {
+      await calcularFechamento();
+    } catch (e) {
+      await uiAlert(e.message || 'Erro ao calcular fechamento', 'error');
+    }
+  });
+  btnConfirmarFechamento?.addEventListener('click', async () => {
+    try {
+      await confirmarFechamentoVenda();
+    } catch (e) {
+      await uiAlert(e.message || 'Erro ao fechar comanda', 'error');
+    }
+  });
+  fechFormaPagamento?.addEventListener('change', () => {
+    if (fechFormaPagamento.value === 'dinheiro') {
+      if (fechValorPago) fechValorPago.value = Number(currentMesa?.total || 0);
+    }
+    if (fechFormaPagamento.value !== 'pix' && fechPixBox) fechPixBox.classList.add('hidden');
+  });
+  fechValorPago?.addEventListener('input', () => {
+    const valorPago = Number.parseFloat(String(fechValorPago.value || '0').replace(',', '.')) || 0;
+    const total = Number(currentMesa?.total || 0);
+    const troco = Math.max(0, valorPago - total);
+    if (fechTroco) fechTroco.textContent = formatarMoedaBR(troco);
+  });
+  fechSplitMode?.addEventListener('change', () => {
+    atualizarVisibilidadeDivisao();
+    if (fechSplitMode.value === 'por_item') {
+      const totalSel = totalSelecionadoSplitPorItem();
+      if (fechValorPago) fechValorPago.value = String(totalSel || 0);
+    }
+  });
+  fechDescontoTipo?.addEventListener('change', () => {
+    atualizarVisibilidadeDesconto();
+  });
+  modalFechamentoVenda?.addEventListener('click', (ev) => {
+    if (ev.target === modalFechamentoVenda) {
+      fecharModalFechamento();
+    }
+  });
+
+  function atualizarVisibilidadeDesconto() {
+    const tipo = String(fechDescontoTipo?.value || 'nenhum');
+    if (fechDescontoValor) {
+      fechDescontoValor.disabled = tipo === 'nenhum';
+      if (tipo === 'nenhum') fechDescontoValor.value = '0';
+    }
+  }
+
+  function totalSelecionadoSplitPorItem() {
+    if (!currentMesa || !Array.isArray(splitPayloadAtual?.itens)) return 0;
+    const itensVenda = currentMesa.itens || [];
+    let total = 0;
+    for (const sel of splitPayloadAtual.itens) {
+      const item = itensVenda.find((i) => Number(i.id) === Number(sel.item_id));
+      if (!item) continue;
+      const qtd = Math.max(0, Math.min(Number(item.quantidade || 0), Number(sel.quantidade || 0)));
+      total += Number(item.preco_unitario || 0) * qtd;
+    }
+    return Number(total.toFixed(2));
+  }
+
+  function atualizarResumoSplitPorItem() {
+    if (!fechItensSplitTotal || !currentMesa) return;
+    const totalSelecionado = totalSelecionadoSplitPorItem();
+    const totalComanda = Number(currentMesa.total || 0);
+    const restante = Math.max(0, Number((totalComanda - totalSelecionado).toFixed(2)));
+    fechItensSplitTotal.textContent = `Selecionado: ${formatarMoedaBR(totalSelecionado)} • Restante: ${formatarMoedaBR(restante)}`;
+  }
+
+  function renderSplitPorItemEditor() {
+    if (!fechItensSplitList || !currentMesa) return;
+    const itens = currentMesa.itens || [];
+    const payloadMap = new Map((splitPayloadAtual?.itens || []).map((x) => [Number(x.item_id), Number(x.quantidade || 0)]));
+    fechItensSplitList.innerHTML = itens.length
+      ? itens
+          .map((item) => {
+            const quantidadeTotal = Number(item.quantidade || 0);
+            const quantidadeSel = Math.min(quantidadeTotal, Math.max(0, payloadMap.get(Number(item.id)) || 0));
+            return `<div style="display:grid;grid-template-columns:1fr 90px;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid #e2e8f0">
+              <div>
+                <div style="font-size:12px;font-weight:700">${item.produto_nome}</div>
+                <div style="font-size:11px;color:#64748b">${quantidadeTotal}x ${formatarMoedaBR(item.preco_unitario || 0)}</div>
+              </div>
+              <input class="split-item-qtd" data-item-id="${item.id}" type="number" min="0" max="${quantidadeTotal}" value="${quantidadeSel}" style="font-size:12px;padding:6px">
+            </div>`;
+          })
+          .join('')
+      : '<p style="font-size:12px;color:#64748b">Sem itens na comanda.</p>';
+    fechItensSplitList.querySelectorAll('.split-item-qtd').forEach((input) => {
+      input.addEventListener('input', () => {
+        const itemId = Number(input.dataset.itemId);
+        const max = Number(input.max || 0);
+        const valor = Math.max(0, Math.min(max, Number(input.value || 0)));
+        input.value = String(valor);
+        const itensSel = (splitPayloadAtual?.itens || []).filter((x) => Number(x.item_id) !== itemId);
+        if (valor > 0) itensSel.push({ item_id: itemId, quantidade: valor });
+        splitPayloadAtual = { itens: itensSel };
+        atualizarResumoSplitPorItem();
+        if ((fechSplitMode?.value || '') === 'por_item' && fechValorPago) {
+          fechValorPago.value = String(totalSelecionadoSplitPorItem());
+        }
+      });
+    });
+    atualizarResumoSplitPorItem();
+  }
+
+  function atualizarVisibilidadeDivisao() {
+    const splitMode = String(fechSplitMode?.value || 'nenhum');
+    const exibirPessoas = splitMode === 'valor_igual';
+    const exibirItens = splitMode === 'por_item';
+    if (fechPessoasGroup) fechPessoasGroup.classList.toggle('hidden', !exibirPessoas);
+    if (fechItensSplitBox) fechItensSplitBox.classList.toggle('hidden', !exibirItens);
+    if (exibirItens) {
+      renderSplitPorItemEditor();
+    } else {
+      splitPayloadAtual = null;
+      if (fechItensSplitList) fechItensSplitList.innerHTML = '';
+      if (fechItensSplitTotal) fechItensSplitTotal.textContent = '';
+    }
+  }
 
   function normalizarCategoria(v) {
     const s = String(v || '').trim().toLowerCase();
@@ -92,21 +475,22 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  function opcoesParaTexto(opcoes) {
-    return opcoes.map((o, idx) => `${idx + 1}) ${o.nome} (${o.extra >= 0 ? '+' : ''}${formatarMoedaBR(o.extra)})`).join('\n');
-  }
-
-  function escolherOpcaoProduto(prod) {
+  async function escolherOpcaoProduto(prod) {
     const opcoes = parseOpcoesProduto(prod);
     if (!opcoes.length) return { observacoes: null, preco: Number(prod.preco || 0) };
-    const msg = `Escolha a variação de ${prod.nome}:\n${opcoesParaTexto(opcoes)}\n\nDigite o número da opção:`;
-    const resp = prompt(msg, '1');
-    if (resp === null) return null;
-    const idx = parseInt(String(resp).trim(), 10) - 1;
-    if (idx < 0 || idx >= opcoes.length) {
-      alert('Opção inválida');
-      return null;
-    }
+    const idx = ui.choose
+      ? await ui.choose({
+          title: `Variação - ${prod.nome}`,
+          message: 'Selecione uma opção para adicionar na comanda.',
+          okLabel: 'Adicionar',
+          items: opcoes.map((o, index) => ({
+            value: index,
+            label: o.nome,
+            meta: `${o.extra >= 0 ? '+' : ''}${formatarMoedaBR(o.extra)}`
+          }))
+        })
+      : 0;
+    if (idx === null || idx === undefined || !opcoes[idx]) return null;
     const sel = opcoes[idx];
     return {
       observacoes: sel.nome,
@@ -160,12 +544,12 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btnClear').addEventListener('click', () => mainTeclado && mainTeclado.clear());
   }
   if (document.getElementById('btnAddValor')) {
-    document.getElementById('btnAddValor').addEventListener('click', () => {
+    document.getElementById('btnAddValor').addEventListener('click', async () => {
       const valor = mainTeclado && mainTeclado.getValue();
-      if (valor === null || valor <= 0) return alert('Digite um valor válido');
+      if (valor === null || valor <= 0) return uiAlert('Digite um valor válido', 'warning');
       adicionarAoCarrinho({ produto_id: 'avulso', nome: `Avulso R$ ${valor.toFixed(2)}`, preco: valor });
       mainTeclado.clear();
-      alert('Adicionado ao carrinho');
+      uiNotify('Adicionado ao carrinho', 'success');
     });
   }
   if (document.getElementById('btnFinalizarVenda')) {
@@ -181,7 +565,7 @@ document.addEventListener('DOMContentLoaded', () => {
   async function abrirComanda() {
     if (abrindoComanda) return;
     if (carrinho.length === 0) {
-      alert('Carrinho vazio');
+      await uiAlert('Carrinho vazio', 'warning');
       return;
     }
 
@@ -241,10 +625,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const tabMesas = document.querySelector('[data-target="mesas"]');
       if (tabMesas) tabMesas.click();
-      alert(comandaExistente ? 'Itens adicionados à comanda existente' : 'Comanda aberta');
+      uiNotify(comandaExistente ? 'Itens adicionados à comanda existente' : 'Comanda aberta', 'success');
     } catch (e) {
       console.error(e);
-      alert('Erro: ' + (e.message || e));
+      await uiAlert('Erro: ' + (e.message || e), 'error');
     } finally {
       abrindoComanda = false;
       if (btnFinalizar) {
@@ -292,7 +676,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   async function removerItemMesa(vendaId, itemId, skipConfirm = false) {
-    if (!skipConfirm && !confirm('Remover item da comanda?')) return;
+    if (!skipConfirm && !(await uiConfirm('Remover item da comanda?', { title: 'Confirmar remoção' }))) return;
     try {
       await API.removerItem(vendaId, itemId);
       const updated = await API.obterVenda(vendaId);
@@ -302,12 +686,12 @@ document.addEventListener('DOMContentLoaded', () => {
       await carregarMesas();
     } catch (e) {
       console.error('Erro ao remover item', e);
-      alert('Erro ao remover item');
+      await uiAlert('Erro ao remover item', 'error');
     }
   }
 
   async function cancelarPedidoItem(vendaId, itemId) {
-    if (!confirm('Cancelar este pedido da comanda?')) return;
+    if (!(await uiConfirm('Cancelar este pedido da comanda?', { title: 'Cancelar pedido' }))) return;
     await removerItemMesa(vendaId, itemId, true);
   }
 
@@ -329,7 +713,7 @@ document.addEventListener('DOMContentLoaded', () => {
       await carregarMesas();
     } catch (e) {
       console.error('Erro ao alterar quantidade', e);
-      alert('Erro ao alterar quantidade');
+      await uiAlert('Erro ao alterar quantidade', 'error');
     }
   }
 
@@ -359,7 +743,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function carregarMesas() {
     try {
-      const vendas = await API.obterVendasAbertas('bar');
+      const vendas = await API.obterVendas({ tipo: 'bar' });
       const el = document.getElementById('listaMesas');
       if (!el) return;
       const lista = (vendas || []).filter((v) => {
@@ -371,16 +755,22 @@ document.addEventListener('DOMContentLoaded', () => {
         const titleTxt = tituloComanda(v).toLowerCase();
         return mesaTxt.includes(filtroComandaTermo) || idTxt.includes(filtroComandaTermo) || titleTxt.includes(filtroComandaTermo);
       });
-      if (!lista.length) {
-        el.innerHTML = '<p style="padding:8px;font-size:12px">Nenhuma comanda aberta</p>';
+      const priorizada = [...lista].sort((a, b) => {
+        const aFechada = String(a.status || '') === 'fechada' ? 1 : 0;
+        const bFechada = String(b.status || '') === 'fechada' ? 1 : 0;
+        if (aFechada !== bFechada) return aFechada - bFechada;
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      });
+      if (!priorizada.length) {
+        el.innerHTML = '<p style="padding:8px;font-size:12px">Nenhuma comanda encontrada</p>';
         return;
       }
-      el.innerHTML = lista
+      el.innerHTML = priorizada
         .map(
           (v) => {
             const status = String(v.status || 'aberta');
-            const cor = status === 'pronta' ? '#16a34a' : status === 'em_preparo' ? '#f59e0b' : '#3b82f6';
-            const label = status === 'em_preparo' ? 'Em preparo' : status === 'pronta' ? 'Pronta' : 'Aberta';
+            const cor = status === 'pronta' ? '#16a34a' : status === 'em_preparo' ? '#f59e0b' : status === 'fechada' ? '#64748b' : '#3b82f6';
+            const label = status === 'em_preparo' ? 'Em preparo' : status === 'pronta' ? 'Pronta' : status === 'fechada' ? 'Fechada' : 'Aberta';
             return `<div class="mesas-list-item" data-id="${v.id}">
               <div style="display:flex;flex-direction:column;gap:4px">
                 <strong>${tituloComanda(v)}</strong>
@@ -404,7 +794,7 @@ document.addEventListener('DOMContentLoaded', () => {
       renderSideMesa(venda);
     } catch (err) {
       console.error(err);
-      alert('Erro ao abrir comanda');
+      await uiAlert('Erro ao abrir comanda', 'error');
     }
   }
 
@@ -412,6 +802,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const sideEl = document.getElementById('sideMesas');
     if (!sideEl) return;
     const itens = venda.itens || [];
+    const comandaFechada = String(venda.status || '') === 'fechada';
     const filtered = produtosCache.filter((p) => p.tipo !== 'avulso' && p.ativo && p.estoque > 0);
     const cats = [...new Set(filtered.map((p) => normalizarCategoria(p.categoria)))].sort();
     const allCats = ['todas', ...cats];
@@ -460,6 +851,9 @@ document.addEventListener('DOMContentLoaded', () => {
       if (venda.status === 'em_preparo') {
         return { label: 'Em preparo', color: '#EF6C00', bg: 'rgba(255,152,0,0.15)' };
       }
+      if (venda.status === 'fechada') {
+        return { label: 'Fechado', color: '#475569', bg: 'rgba(148,163,184,0.14)' };
+      }
       return { label: 'Aguardando', color: '#1565C0', bg: 'rgba(33,150,243,0.15)' };
     };
 
@@ -467,6 +861,11 @@ document.addEventListener('DOMContentLoaded', () => {
       <div class="sidebar-section">
         <h3>Comanda ${tituloComanda(venda)}</h3>
         <div style="font-size:12px;margin-bottom:8px">Total: <strong style="color:var(--success)">${formatarMoedaBR(venda.total || 0)}</strong></div>
+        <div style="font-size:12px;margin-bottom:8px">Cliente: <strong>${venda.cliente_nome || 'Não vinculado'}</strong></div>
+        <div style="display:flex;gap:6px;margin-bottom:8px">
+          <button id="btnVincularClienteMesa" class="btn btn-small btn-secondary" style="flex:1;padding:6px;font-size:11px" ${comandaFechada ? 'disabled' : ''}>Vincular cliente</button>
+          <button id="btnReabrirVendaMesa" class="btn btn-small" style="flex:1;padding:6px;font-size:11px">Reabrir venda</button>
+        </div>
         <h4 style="margin:8px 0 4px;font-size:12px">Itens</h4>
         <div class="mesa-items-list">
           ${
@@ -483,10 +882,10 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div style="display:inline-block;margin-top:2px;padding:1px 6px;border-radius:10px;font-size:10px;color:${st.color};background:#fff">${st.label}</div>
                       </div>
                       <div style="display:flex;gap:4px;align-items:center">
-                        <button onclick="alterarQuantidadeMesa(${venda.id},${i.id},-1)" style="padding:2px 4px;font-size:10px;border:1px solid #ccc;background:#fff;cursor:pointer;border-radius:2px">-</button>
+                        <button onclick="alterarQuantidadeMesa(${venda.id},${i.id},-1)" ${comandaFechada ? 'disabled' : ''} style="padding:2px 4px;font-size:10px;border:1px solid #ccc;background:#fff;cursor:pointer;border-radius:2px">-</button>
                         <span style="min-width:18px;text-align:center;font-size:10px">${i.quantidade}</span>
-                        <button onclick="alterarQuantidadeMesa(${venda.id},${i.id},1)" style="padding:2px 4px;font-size:10px;border:1px solid #ccc;background:#fff;cursor:pointer;border-radius:2px">+</button>
-                        <button onclick="cancelarPedidoItem(${venda.id},${i.id})" style="padding:2px 6px;font-size:10px;background:var(--danger);color:white;border:none;cursor:pointer;border-radius:2px">Cancelar</button>
+                        <button onclick="alterarQuantidadeMesa(${venda.id},${i.id},1)" ${comandaFechada ? 'disabled' : ''} style="padding:2px 4px;font-size:10px;border:1px solid #ccc;background:#fff;cursor:pointer;border-radius:2px">+</button>
+                        <button onclick="cancelarPedidoItem(${venda.id},${i.id})" ${comandaFechada ? 'disabled' : ''} style="padding:2px 6px;font-size:10px;background:var(--danger);color:white;border:none;cursor:pointer;border-radius:2px">Cancelar</button>
                       </div>
                       <span style="color:var(--success);font-weight:bold;min-width:50px;text-align:right">${formatarMoedaBR(i.subtotal)}</span>
                     </div>`;
@@ -501,18 +900,18 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
         <div id="blocoProdutos" style="display:block">
           <h4 style="margin:8px 0 4px;font-size:12px">Adicionar Produto</h4>
-          ${prodGrid}
+          ${comandaFechada ? '<p style="font-size:12px;color:#64748b">Comanda fechada. Reabra para adicionar itens.</p>' : prodGrid}
         </div>
         <div id="blocoAvulso" style="display:none">
           <h4 style="margin:8px 0 4px;font-size:12px">Valor Avulso</h4>
           <div id="sideMesaDisplay" class="display-value" style="font-size:18px;margin-bottom:8px">R$ 0,00</div>
           <div id="sideMesaTeclado" class="numeric-pad" style="grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px"></div>
           <div style="display:flex;gap:4px;flex-direction:column;margin-bottom:12px">
-            <button id="btnSideMesaClear" class="pad-key secondary" style="padding:8px;font-size:11px">Limpar</button>
-            <button id="btnSideMesaAddValor" class="pad-key" style="padding:8px;font-size:11px">Adicionar Valor</button>
+            <button id="btnSideMesaClear" class="pad-key secondary" style="padding:8px;font-size:11px" ${comandaFechada ? 'disabled' : ''}>Limpar</button>
+            <button id="btnSideMesaAddValor" class="pad-key" style="padding:8px;font-size:11px" ${comandaFechada ? 'disabled' : ''}>Adicionar Valor</button>
           </div>
         </div>
-        <button id="btnSideMesaFechar" class="btn btn-success btn-block" style="font-size:12px;padding:10px">Fechar Comanda</button>
+        <button id="btnSideMesaFechar" class="btn btn-success btn-block" style="font-size:12px;padding:10px" ${comandaFechada ? 'disabled' : ''}>Tela de Fechamento</button>
       </div>
     `;
 
@@ -544,8 +943,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btnSideAdd) {
       btnSideAdd.addEventListener('click', async () => {
         const valor = mesaTeclado && mesaTeclado.getValue();
-        if (valor === null || valor <= 0) return alert('Valor inválido');
-        if (!currentMesa) return alert('Nenhuma comanda selecionada');
+        if (valor === null || valor <= 0) return uiAlert('Valor inválido', 'warning');
+        if (!currentMesa) return uiAlert('Nenhuma comanda selecionada', 'warning');
         try {
           const temp = await API.criarProduto({
             nome: `Avulso R$ ${valor.toFixed(2)} #${Date.now()}`,
@@ -575,7 +974,7 @@ document.addEventListener('DOMContentLoaded', () => {
           await carregarMesas();
         } catch (e) {
           console.error(e);
-          alert('Erro ao adicionar valor');
+          await uiAlert('Erro ao adicionar valor', 'error');
         }
       });
     }
@@ -587,7 +986,7 @@ document.addEventListener('DOMContentLoaded', () => {
         try {
           const produto = produtosCache.find((p) => Number(p.id) === pid);
           if (!produto) return;
-          const opcao = escolherOpcaoProduto(produto);
+          const opcao = await escolherOpcaoProduto(produto);
           if (opcao === null) return;
           await API.adicionarItem(currentMesa.id, pid, 1, {
             observacoes: opcao.observacoes || null,
@@ -600,7 +999,7 @@ document.addEventListener('DOMContentLoaded', () => {
           await carregarMesas();
         } catch (er) {
           console.error(er);
-          alert(er.message || 'Erro ao adicionar item');
+          await uiAlert(er.message || 'Erro ao adicionar item', 'error');
         }
       });
     });
@@ -616,20 +1015,57 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btnFechar) {
       btnFechar.addEventListener('click', async () => {
         if (!currentMesa) return;
-        if (!confirm('Fechar comanda?')) return;
-        try {
-          await API.fecharVenda(currentMesa.id, 'dinheiro');
-          document.getElementById('sideMesas').innerHTML = '<p style="color:#999;font-size:12px">Selecione uma comanda à esquerda</p>';
-          currentMesa = null;
-          vendaAtual = null;
-          localStorage.removeItem('vendaAtual');
-          await carregarMesas();
-          await carregarProdutosCompleto();
-          alert('Comanda fechada');
-        } catch (e) {
-          console.error(e);
-          alert('Erro ao fechar comanda');
+        abrirModalFechamento();
+      });
+    }
+
+    const btnVincularClienteMesa = document.getElementById('btnVincularClienteMesa');
+    if (btnVincularClienteMesa) {
+      btnVincularClienteMesa.addEventListener('click', async () => {
+        if (!currentMesa) return;
+        const clientes = await API.obterClientes('');
+        if (!clientes.length) return uiAlert('Nenhum cliente cadastrado.', 'warning');
+        const removerLabel = currentMesa?.cliente_id ? 'Remover vínculo de cliente' : 'Nenhum cliente';
+        const choice = ui.choose
+          ? await ui.choose({
+              title: 'Vincular cliente',
+              message: 'Selecione um cliente para esta comanda.',
+              okLabel: 'Vincular',
+              items: [
+                { value: null, label: removerLabel, meta: 'Comanda ficará sem cliente vinculado' },
+                ...clientes.map((c) => ({
+                  value: Number(c.id),
+                  label: `#${c.id} ${c.nome}`,
+                  meta: c.telefone || 'Sem telefone'
+                }))
+              ]
+            })
+          : null;
+        if (choice === undefined) return;
+        const clienteId = choice === null ? null : Number(choice);
+        await API.vincularClienteVenda(currentMesa.id, clienteId);
+        const atualizada = await API.obterVenda(currentMesa.id);
+        currentMesa = atualizada;
+        renderSideMesa(atualizada);
+        await carregarMesas();
+        uiNotify(clienteId ? 'Cliente vinculado à comanda' : 'Vínculo removido', 'success');
+      });
+    }
+
+    const btnReabrirVendaMesa = document.getElementById('btnReabrirVendaMesa');
+    if (btnReabrirVendaMesa) {
+      btnReabrirVendaMesa.addEventListener('click', async () => {
+        if (!currentMesa) return;
+        if (String(currentMesa.status) !== 'fechada') {
+          return uiAlert('Esta comanda já está aberta.', 'warning');
         }
+        if (!(await uiConfirm('Reabrir esta comanda fechada?', { title: 'Reabrir comanda' }))) return;
+        await API.reabrirVenda(currentMesa.id);
+        const atualizada = await API.obterVenda(currentMesa.id);
+        currentMesa = atualizada;
+        renderSideMesa(atualizada);
+        await carregarMesas();
+        uiNotify('Comanda reaberta', 'success');
       });
     }
   }
@@ -675,12 +1111,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     el.querySelectorAll('.product-card').forEach((card) => {
-      card.addEventListener('click', () => {
+      card.addEventListener('click', async () => {
         const produto = base.find((p) => String(p.id) === String(card.dataset.id));
         const estoque = Number((produto || { estoque: 0 }).estoque || 0);
-        if (estoque <= 0) return alert('Produto sem estoque');
+        if (estoque <= 0) return uiAlert('Produto sem estoque', 'warning');
         if (!produto) return;
-        const opcao = escolherOpcaoProduto(produto);
+        const opcao = await escolherOpcaoProduto(produto);
         if (opcao === null) return;
         adicionarAoCarrinho({
           produto_id: card.dataset.id,
@@ -695,7 +1131,18 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderProdutosList(produtos) {
     const el = document.getElementById('prodList');
     if (!el) return;
-    const filtered = produtos.filter((p) => p.tipo !== 'avulso');
+    const termo = String(filtroProdutoEstoque || '').toLowerCase().trim();
+    const filtered = produtos.filter((p) => {
+      if (p.tipo === 'avulso') return false;
+      if (!termo) return true;
+      const nome = String(p.nome || '').toLowerCase();
+      const categoria = String(p.categoria || '').toLowerCase();
+      return nome.includes(termo) || categoria.includes(termo);
+    });
+    if (!filtered.length) {
+      el.innerHTML = '<p style="font-size:12px;color:#64748b">Nenhum produto encontrado.</p>';
+      return;
+    }
     el.innerHTML = filtered
       .map(
         (p) =>
@@ -728,7 +1175,7 @@ document.addEventListener('DOMContentLoaded', () => {
           ev.target.value = '';
           if (preview) preview.style.display = 'none';
           produtoImagemBase64 = null;
-          alert('Arquivo muito grande (máx 5MB)');
+          uiAlert('Arquivo muito grande (máx 5MB)', 'warning');
           return;
         }
         const reader = new FileReader();
@@ -757,6 +1204,7 @@ document.addEventListener('DOMContentLoaded', () => {
       atualizarListaCategoriasFormulario(produtosCache);
       renderProdutosGrid(produtosCache);
       renderProdutosList(produtosCache);
+      preencherSelectProdutoPromocao();
     } catch (e) {
       console.error('Erro ao carregar produtos:', e);
     }
@@ -792,7 +1240,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (btnCriarProduto) {
     btnCriarProduto.addEventListener('click', async () => {
       if (criacaoProdutoEmProgresso) {
-        alert('Aguarde...');
+        await uiAlert('Aguarde...', 'info');
         return;
       }
       const nome = document.getElementById('novoProdutoNome').value || '';
@@ -804,11 +1252,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const opcoes_json = lerVariacoesEditorJson();
       const vaiCozinha = !!document.getElementById('novoProdutoVaiCozinha')?.checked;
       if (!nome.trim() || isNaN(preco)) {
-        alert('Preencha nome e preço');
+        await uiAlert('Preencha nome e preço', 'warning');
         return;
       }
       if (preco <= 0) {
-        alert('Preço deve ser maior que zero');
+        await uiAlert('Preço deve ser maior que zero', 'warning');
         return;
       }
 
@@ -828,7 +1276,7 @@ document.addEventListener('DOMContentLoaded', () => {
             imagem: produtoImagemBase64,
             vai_cozinha: vaiCozinha
           });
-          alert('Produto atualizado!');
+          uiNotify('Produto atualizado!', 'success');
         } else {
           btnCriarProduto.textContent = 'Criando...';
           await API.criarProduto({
@@ -844,13 +1292,13 @@ document.addEventListener('DOMContentLoaded', () => {
             imagem: produtoImagemBase64,
             vai_cozinha: vaiCozinha
           });
-          alert('Produto criado com sucesso!');
+          uiNotify('Produto criado com sucesso!', 'success');
         }
         limparFormularioProduto();
         await carregarProdutosCompleto();
       } catch (e) {
         console.error('Erro ao salvar produto:', e);
-        alert('Erro: ' + (e.message || e));
+        await uiAlert('Erro: ' + (e.message || e), 'error');
       } finally {
         criacaoProdutoEmProgresso = false;
         btnCriarProduto.disabled = false;
@@ -932,7 +1380,7 @@ document.addEventListener('DOMContentLoaded', () => {
   if (btnCancelarEdicao) btnCancelarEdicao.addEventListener('click', () => limparFormularioProduto());
 
   window.deletarProduto = async (id) => {
-    if (!confirm('Deletar produto?')) return;
+    if (!(await uiConfirm('Deletar produto?', { title: 'Excluir produto' }))) return;
     try {
       await API.deletarProduto(id);
       await carregarProdutosCompleto();
@@ -943,7 +1391,161 @@ document.addEventListener('DOMContentLoaded', () => {
         renderSideMesa(updated);
       }
     } catch (e) {
-      alert('Erro ao deletar');
+      await uiAlert('Erro ao deletar', 'error');
+    }
+  };
+
+  // ===== PROMOCOES =====
+  function preencherSelectProdutoPromocao() {
+    const el = document.getElementById('promoProdutoId');
+    if (!el) return;
+    const lista = (produtosCache || [])
+      .filter((p) => p.tipo !== 'avulso')
+      .sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR'));
+    const atual = el.value;
+    el.innerHTML = lista.length
+      ? lista
+          .map(
+            (p) =>
+              `<option value="${p.id}">${p.nome} (${formatarMoedaBR(p.preco)})${Number(p.ativo || 0) === 1 ? '' : ' • inativo'}</option>`
+          )
+          .join('')
+      : '<option value="">Sem produtos cadastrados</option>';
+    if (atual && el.querySelector(`option[value="${atual}"]`)) {
+      el.value = atual;
+    }
+  }
+
+  function limparFormularioPromocao() {
+    promocaoEmEdicaoId = null;
+    document.getElementById('promoNome').value = '';
+    document.getElementById('promoDescricao').value = '';
+    document.getElementById('promoTipo').value = 'combo_produto';
+    document.getElementById('promoQuantidadeMin').value = '3';
+    document.getElementById('promoPrecoCombo').value = '15';
+    document.getElementById('promoRepetirNaVenda').checked = true;
+    document.getElementById('promoAtiva').checked = true;
+    const btn = document.getElementById('btnSalvarPromocao');
+    if (btn) btn.textContent = 'Salvar Promoção';
+    document.querySelectorAll('#listaPromocoes .product-list-item').forEach((x) => x.classList.remove('selected'));
+  }
+
+  function renderPromocoesLista() {
+    const el = document.getElementById('listaPromocoes');
+    if (!el) return;
+    if (!promocoesCache.length) {
+      el.innerHTML = '<p style="font-size:12px;color:#64748b">Nenhuma promoção cadastrada.</p>';
+      return;
+    }
+    el.innerHTML = promocoesCache
+      .map((p) => {
+        const tag = Number(p.ativo || 0) === 1 ? '<span style="color:#16a34a">Ativa</span>' : '<span style="color:#64748b">Inativa</span>';
+        const regra =
+          String(p.tipo || '') === 'combo_produto'
+            ? `${Number(p.quantidade_min || 0)}x ${p.produto_nome || `#${p.produto_id}`} por ${formatarMoedaBR(p.preco_combo || 0)}`
+            : 'Regra personalizada';
+        const repeticaoTxt = Number(p.repetir_na_venda ?? 1) === 1 ? 'Acumula na venda' : '1x por venda';
+        return `<div class="product-list-item ${Number(promocaoEmEdicaoId) === Number(p.id) ? 'selected' : ''}" data-id="${p.id}">
+          <div>
+            <div class="product-list-item-name">${p.nome}</div>
+            <div style="font-size:11px;color:#64748b">${regra}</div>
+            <div style="font-size:11px;color:#64748b">${tag} • ${repeticaoTxt}</div>
+          </div>
+          <div class="product-list-item-info">
+            <button class="btn btn-secondary btn-soft" type="button" onclick="editarPromocao(${p.id})">Editar</button>
+            <button class="delete-btn" onclick="removerPromocao(${p.id})">X</button>
+          </div>
+        </div>`;
+      })
+      .join('');
+    el.querySelectorAll('.product-list-item').forEach((item) => {
+      item.addEventListener('click', () => {
+        const id = Number(item.dataset.id);
+        window.editarPromocao(id);
+      });
+    });
+  }
+
+  async function carregarPromocoes() {
+    try {
+      promocoesCache = await API.obterPromocoes(null);
+      if (promocaoEmEdicaoId && !promocoesCache.some((p) => Number(p.id) === Number(promocaoEmEdicaoId))) {
+        limparFormularioPromocao();
+      }
+      renderPromocoesLista();
+    } catch (e) {
+      console.error('Erro ao carregar promoções:', e);
+    }
+  }
+
+  const btnSalvarPromocao = document.getElementById('btnSalvarPromocao');
+  if (btnSalvarPromocao) {
+    btnSalvarPromocao.addEventListener('click', async () => {
+      const nome = String(document.getElementById('promoNome')?.value || '').trim();
+      const descricao = String(document.getElementById('promoDescricao')?.value || '').trim();
+      const tipo = String(document.getElementById('promoTipo')?.value || 'combo_produto');
+      const produtoId = Number(document.getElementById('promoProdutoId')?.value || 0) || null;
+      const quantidadeMin = Math.max(1, Number(document.getElementById('promoQuantidadeMin')?.value || 1));
+      const precoCombo = Number.parseFloat(String(document.getElementById('promoPrecoCombo')?.value || '0').replace(',', '.')) || 0;
+      const repetirNaVenda = !!document.getElementById('promoRepetirNaVenda')?.checked;
+      const ativa = !!document.getElementById('promoAtiva')?.checked;
+      if (!nome) return uiAlert('Informe o nome da promoção', 'warning');
+      if (!produtoId) return uiAlert('Selecione um produto', 'warning');
+      if (precoCombo <= 0) return uiAlert('Preço do combo deve ser maior que zero', 'warning');
+      try {
+        const payload = {
+          nome,
+          descricao: descricao || null,
+          tipo,
+          produto_id: produtoId,
+          quantidade_min: quantidadeMin,
+          repetir_na_venda: repetirNaVenda,
+          preco_combo: precoCombo,
+          ativo: ativa
+        };
+        if (promocaoEmEdicaoId) {
+          await API.atualizarPromocao(promocaoEmEdicaoId, payload);
+          uiNotify('Promoção atualizada', 'success');
+        } else {
+          await API.criarPromocao(payload);
+          uiNotify('Promoção salva', 'success');
+        }
+        limparFormularioPromocao();
+        await carregarPromocoes();
+      } catch (e) {
+        await uiAlert(e.message || 'Erro ao salvar promoção', 'error');
+      }
+    });
+  }
+
+  window.editarPromocao = async (id) => {
+    const promo = promocoesCache.find((x) => Number(x.id) === Number(id));
+    if (!promo) return;
+    promocaoEmEdicaoId = Number(promo.id);
+    document.getElementById('promoNome').value = promo.nome || '';
+    document.getElementById('promoDescricao').value = promo.descricao || '';
+    document.getElementById('promoTipo').value = promo.tipo || 'combo_produto';
+    document.getElementById('promoProdutoId').value = String(promo.produto_id || '');
+    document.getElementById('promoQuantidadeMin').value = String(Number(promo.quantidade_min || 1));
+    document.getElementById('promoPrecoCombo').value = String(Number(promo.preco_combo || 0));
+    document.getElementById('promoRepetirNaVenda').checked = Number(promo.repetir_na_venda ?? 1) === 1;
+    document.getElementById('promoAtiva').checked = Number(promo.ativo || 0) === 1;
+    const btn = document.getElementById('btnSalvarPromocao');
+    if (btn) btn.textContent = 'Salvar Alterações';
+    renderPromocoesLista();
+  };
+
+  window.removerPromocao = async (id) => {
+    if (!(await uiConfirm('Remover promoção?', { title: 'Excluir promoção' }))) return;
+    try {
+      await API.removerPromocao(id);
+      if (Number(promocaoEmEdicaoId) === Number(id)) {
+        limparFormularioPromocao();
+      }
+      await carregarPromocoes();
+      uiNotify('Promoção removida', 'success');
+    } catch (e) {
+      await uiAlert(e.message || 'Erro ao remover promoção', 'error');
     }
   };
 
@@ -1004,6 +1606,38 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btnCancelar) btnCancelar.style.display = 'none';
     if (btnSalvar) btnSalvar.textContent = 'Salvar Cliente';
     renderClientesLista(clientesCache);
+    const resumo = document.getElementById('clienteResumoHistorico');
+    const lista = document.getElementById('clienteHistoricoLista');
+    if (resumo) resumo.textContent = 'Selecione um cliente para ver o histórico.';
+    if (lista) lista.innerHTML = '';
+  }
+
+  async function carregarHistoricoCliente(id) {
+    const resumo = document.getElementById('clienteResumoHistorico');
+    const lista = document.getElementById('clienteHistoricoLista');
+    if (!resumo || !lista) return;
+    try {
+      const hist = await API.obterHistoricoCliente(id, 30);
+      resumo.textContent = `${hist.total_pedidos || 0} pedido(s) • Total ${formatarMoedaBR(hist.faturamento_total || 0)}`;
+      const pedidos = hist.pedidos || [];
+      if (!pedidos.length) {
+        lista.innerHTML = '<p style="font-size:11px;color:#64748b">Sem pedidos vinculados para este cliente.</p>';
+        return;
+      }
+      lista.innerHTML = pedidos
+        .map(
+          (p) =>
+            `<div style="padding:6px 0;border-bottom:1px solid #eee">
+              <div style="font-size:11px;font-weight:700">#${p.id} • ${p.mesa ? `Mesa ${p.mesa}` : 'Balcão'} • ${p.status}</div>
+              <div style="font-size:10px;color:#64748b">${new Date(p.created_at).toLocaleString('pt-BR')} • ${p.itens_total} item(ns)</div>
+              <div style="font-size:11px;color:#16a34a;font-weight:700">${formatarMoedaBR(p.total || 0)}</div>
+            </div>`
+        )
+        .join('');
+    } catch (e) {
+      resumo.textContent = 'Erro ao carregar histórico.';
+      lista.innerHTML = `<p style="font-size:11px;color:#b91c1c">${e.message || 'Falha no histórico'}</p>`;
+    }
   }
 
   function selecionarCliente(id) {
@@ -1025,6 +1659,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btnCancelar) btnCancelar.style.display = 'block';
     if (btnSalvar) btnSalvar.textContent = 'Salvar Alterações';
     renderClientesLista(clientesCache);
+    carregarHistoricoCliente(c.id);
   }
 
   async function salvarCliente() {
@@ -1032,7 +1667,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const telefone = document.getElementById('clienteTelefone')?.value?.trim() || '';
     const pontos = Number.parseInt(document.getElementById('clientePontos')?.value || '0', 10) || 0;
     const observacoes = document.getElementById('clienteObs')?.value?.trim() || '';
-    if (!nome) return alert('Nome do cliente é obrigatório');
+    if (!nome) return uiAlert('Nome do cliente é obrigatório', 'warning');
     try {
       if (clienteSelecionado) {
         await API.atualizarCliente(clienteSelecionado, { nome, telefone, pontos, observacoes });
@@ -1042,18 +1677,18 @@ document.addEventListener('DOMContentLoaded', () => {
       await carregarClientes();
       limparFormularioCliente();
     } catch (e) {
-      alert(e.message || 'Erro ao salvar cliente');
+      await uiAlert(e.message || 'Erro ao salvar cliente', 'error');
     }
   }
 
   window.removerCliente = async (id) => {
-    if (!confirm('Remover cliente?')) return;
+    if (!(await uiConfirm('Remover cliente?', { title: 'Excluir cliente' }))) return;
     try {
       await API.removerCliente(id);
       await carregarClientes();
       if (clienteSelecionado === id) limparFormularioCliente();
     } catch (e) {
-      alert(e.message || 'Erro ao remover cliente');
+      await uiAlert(e.message || 'Erro ao remover cliente', 'error');
     }
   };
 
@@ -1063,9 +1698,14 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       await carregarProdutosCompleto();
       await carregarMesas();
+      await carregarCaixaResumo();
       const clientesTab = document.getElementById('clientes');
       if (clientesTab && !clientesTab.classList.contains('hidden')) {
         await carregarClientes();
+      }
+      const promocoesTab = document.getElementById('promocoes');
+      if (promocoesTab && !promocoesTab.classList.contains('hidden')) {
+        await carregarPromocoes();
       }
       if (currentMesa) {
         try {
@@ -1088,7 +1728,9 @@ document.addEventListener('DOMContentLoaded', () => {
   carregarProdutosCompleto().then(async () => {
     limparFormularioProduto();
     await carregarMesas();
+    await carregarCaixaResumo();
     await carregarClientes();
+    await carregarPromocoes();
   });
   document.getElementById('btnSalvarCliente')?.addEventListener('click', salvarCliente);
   document.getElementById('btnCancelarCliente')?.addEventListener('click', limparFormularioCliente);

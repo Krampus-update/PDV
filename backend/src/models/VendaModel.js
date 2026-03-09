@@ -12,13 +12,15 @@ class VendaModel {
     }
 
     const result = await dbRun(
-      `INSERT INTO vendas (tipo, status, numero_pedido, mesa, total) 
-       VALUES (?, ?, ?, ?, ?)`,
+      `INSERT INTO vendas (tipo, status, numero_pedido, mesa, cliente_id, caixa_sessao_id, total) 
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [
         dados.tipo,
         dados.status || 'aberta',
         numero_pedido,
         dados.mesa || null,
+        dados.cliente_id || null,
+        dados.caixa_sessao_id || null,
         dados.total || 0
       ]
     );
@@ -27,47 +29,61 @@ class VendaModel {
       id: result.lastID,
       tipo: dados.tipo,
       numero_pedido: numero_pedido,
-      mesa: dados.mesa || null
+      mesa: dados.mesa || null,
+      cliente_id: dados.cliente_id || null,
+      caixa_sessao_id: dados.caixa_sessao_id || null
     };
   }
 
   static async obterPorId(id) {
-    return dbGet('SELECT * FROM vendas WHERE id = ?', [id]);
+    return dbGet(
+      `SELECT v.*, c.nome as cliente_nome, c.telefone as cliente_telefone
+       FROM vendas v
+       LEFT JOIN clientes c ON c.id = v.cliente_id
+       WHERE v.id = ?`,
+      [id]
+    );
   }
 
   static async obterTodas(filtros = {}) {
-    let query = 'SELECT * FROM vendas WHERE 1=1';
+    let query = `SELECT v.*, c.nome as cliente_nome, c.telefone as cliente_telefone
+                 FROM vendas v
+                 LEFT JOIN clientes c ON c.id = v.cliente_id
+                 WHERE 1=1`;
     const values = [];
 
     if (filtros.tipo) {
-      query += ' AND tipo = ?';
+      query += ' AND v.tipo = ?';
       values.push(filtros.tipo);
     }
 
     if (filtros.status) {
-      query += ' AND status = ?';
+      query += ' AND v.status = ?';
       values.push(filtros.status);
     }
 
     if (filtros.data_inicio && filtros.data_fim) {
-      query += ' AND created_at BETWEEN ? AND ?';
+      query += ' AND v.created_at BETWEEN ? AND ?';
       values.push(filtros.data_inicio, filtros.data_fim);
     }
 
-    query += ' ORDER BY created_at DESC';
+    query += ' ORDER BY v.created_at DESC';
     return dbAll(query, values);
   }
 
   static async obertasAbertas(tipo = null) {
-    let query = 'SELECT * FROM vendas WHERE status IN (\'aberta\', \'em_preparo\', \'pronta\')';
+    let query = `SELECT v.*, c.nome as cliente_nome, c.telefone as cliente_telefone
+                 FROM vendas v
+                 LEFT JOIN clientes c ON c.id = v.cliente_id
+                 WHERE v.status IN ('aberta', 'em_preparo', 'pronta')`;
     const values = [];
 
     if (tipo) {
-      query += ' AND tipo = ?';
+      query += ' AND v.tipo = ?';
       values.push(tipo);
     }
 
-    query += ' ORDER BY created_at DESC';
+    query += ' ORDER BY v.created_at DESC';
     return dbAll(query, values);
   }
 
@@ -99,10 +115,38 @@ class VendaModel {
     const values = [];
 
     for (const [key, value] of Object.entries(dados)) {
-      if (['status', 'total', 'forma_pagamento', 'observacoes', 'mesa'].includes(key)) {
+      if (
+        [
+          'status',
+          'total',
+          'forma_pagamento',
+          'observacoes',
+          'mesa',
+          'caixa_sessao_id',
+          'subtotal_bruto',
+          'desconto_tipo',
+          'desconto_valor',
+          'desconto_descricao',
+          'acrescimo_valor',
+          'valor_pago',
+          'troco_valor',
+          'split_mode',
+          'split_payload_json',
+          'pagamento_provider',
+          'pagamento_status',
+          'pagamento_transacao_id',
+          'pix_payload',
+          'pix_chave_utilizada',
+          'promocao_aplicada_id'
+        ].includes(key)
+      ) {
         fields.push(`${key} = ?`);
         values.push(value);
       }
+    }
+    if (Object.prototype.hasOwnProperty.call(dados, 'cliente_id')) {
+      fields.push('cliente_id = ?');
+      values.push(dados.cliente_id || null);
     }
 
     if (fields.length === 0) return 0;
@@ -129,12 +173,21 @@ class VendaModel {
       'SELECT COALESCE(SUM(subtotal), 0) as total FROM venda_itens WHERE venda_id = ?',
       [id]
     );
-    
-    if (result) {
-      await dbRun('UPDATE vendas SET total = ? WHERE id = ?', [result.total, id]);
-      return result.total;
-    }
-    return 0;
+    if (!result) return 0;
+
+    const venda = await dbGet(
+      'SELECT desconto_valor, acrescimo_valor FROM vendas WHERE id = ?',
+      [id]
+    );
+    const subtotal = Number(result.total || 0);
+    const desconto = Number(venda?.desconto_valor || 0);
+    const acrescimo = Number(venda?.acrescimo_valor || 0);
+    const totalFinal = Math.max(0, subtotal - desconto + acrescimo);
+    await dbRun(
+      'UPDATE vendas SET subtotal_bruto = ?, total = ? WHERE id = ?',
+      [subtotal, totalFinal, id]
+    );
+    return totalFinal;
   }
 }
 
