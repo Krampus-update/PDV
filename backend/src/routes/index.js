@@ -1,4 +1,7 @@
 import express from 'express';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import produtosRoutes from './produtos.js';
 import vendasRoutes from './vendas.js';
 import historicoRoutes from './historico.js';
@@ -13,11 +16,22 @@ import pagamentosRoutes from './pagamentos.js';
 import promocoesRoutes from './promocoes.js';
 
 const router = express.Router();
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const backendPkgPath = path.join(__dirname, '../../package.json');
+const frontendVersionPath = path.join(__dirname, '../../../frontend/version.json');
+let backendVersion = 'unknown';
+let frontendVersion = 'unknown';
+try {
+  backendVersion = JSON.parse(fs.readFileSync(backendPkgPath, 'utf8')).version || 'unknown';
+} catch {}
+try {
+  frontendVersion = JSON.parse(fs.readFileSync(frontendVersionPath, 'utf8')).version || 'unknown';
+} catch {}
 
 router.get('/', (req, res) => {
   res.json({
     system: 'PDV System',
-    version: '1.0.0',
+    version: backendVersion,
     message: 'API do sistema de PDV para Bar e Fast Food',
     endpoints: {
       status: '/api/status',
@@ -57,6 +71,13 @@ router.get('/status', (req, res) => {
   res.json({ 
     status: 'OK',
     message: 'API PDV está funcionando'
+  });
+});
+
+router.get('/version', (req, res) => {
+  res.json({
+    backend: backendVersion,
+    frontend: frontendVersion
   });
 });
 

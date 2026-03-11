@@ -67,6 +67,13 @@
                 <button id="btnSalvarCfg" class="btn btn-primary" type="button">Salvar</button>
               </div>
             </div>
+            <div class="cfg-card" style="margin-top:12px">
+              <h4 style="margin:0 0 6px;color:#0f172a">Versões</h4>
+              <div style="display:flex;gap:12px;font-size:12px;color:#64748b">
+                <div>Backend: <strong id="cfgVersionBackend">-</strong></div>
+                <div>Frontend: <strong id="cfgVersionFrontend">-</strong></div>
+              </div>
+            </div>
           </section>
 
           <section class="cfg-popup-pane" data-pane="impressao">
@@ -307,6 +314,27 @@
     function setPagStatus(msg, isError) {
       pagStatus.textContent = msg || '';
       pagStatus.style.color = isError ? '#b91c1c' : '#64748b';
+    }
+
+    async function loadVersions() {
+      const backendEl = modal.querySelector('#cfgVersionBackend');
+      const frontendEl = modal.querySelector('#cfgVersionFrontend');
+      if (!backendEl || !frontendEl) return;
+      backendEl.textContent = '-';
+      frontendEl.textContent = '-';
+      try {
+        const ver = await API.request('GET', '/version');
+        backendEl.textContent = ver?.backend || '-';
+        frontendEl.textContent = ver?.frontend || '-';
+        return;
+      } catch {
+        // fallback
+      }
+      try {
+        const resp = await fetch('/frontend/version.json');
+        const data = await resp.json();
+        frontendEl.textContent = data?.version || '-';
+      } catch {}
     }
 
     function atualizarCamposImpressora() {
@@ -599,7 +627,7 @@
       loadAll: async () => {
         loadCfg();
         atualizarCamposImpressora();
-        await Promise.all([loadPrinterCfg(), loadPixCfg(), loadPagCfg(), listarUsuarios()]);
+        await Promise.all([loadPrinterCfg(), loadPixCfg(), loadPagCfg(), listarUsuarios(), loadVersions()]);
       }
     };
   }

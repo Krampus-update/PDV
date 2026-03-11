@@ -9,7 +9,7 @@ color 0A
 :: 1) Instala Git e Node.js LTS (winget)
 :: 2) Clona repo do GitHub
 :: 3) Instala dependencias do backend (npm install)
-:: 4) Cria scripts/atalhos para iniciar e parar
+:: 4) Cria script/atalho para iniciar
 :: ==========================================================
 
 set "DESKTOP=%USERPROFILE%\Desktop"
@@ -171,7 +171,6 @@ popd
 
 echo [7/7] Criando scripts e atalhos...
 set "START_SCRIPT=%APP_DIR%\INICIAR_PDV.bat"
-set "STOP_SCRIPT=%APP_DIR%\PARAR_PDV.bat"
 
 > "%START_SCRIPT%" (
   echo @echo off
@@ -192,23 +191,10 @@ set "STOP_SCRIPT=%APP_DIR%\PARAR_PDV.bat"
   echo if not exist logs mkdir logs ^>nul 2^>^&1
   echo echo Iniciando servidor PDV...
   echo echo Logs em: backend\logs\server.log
+  echo start "" "http://localhost:3000"
   echo npm start 1^>^> logs\server.log 2^>^&1
   echo echo.
   echo echo Servidor encerrado.
-  echo pause
-)
-
-> "%STOP_SCRIPT%" (
-  echo @echo off
-  echo setlocal EnableExtensions
-  echo title PDV - Parar Servidor
-  echo echo Encerrando janela do servidor PDV...
-  echo taskkill /FI "WINDOWTITLE eq PDV - Servidor*" /T /F ^>nul 2^>^&1
-  echo if errorlevel 1 ^(
-  echo   echo Nenhum servidor PDV ativo encontrado.
-  echo ^) else ^(
-  echo   echo Servidor PDV encerrado.
-  echo ^)
   echo pause
 )
 set "DESKTOP_TARGET="
@@ -216,33 +202,21 @@ if exist "%USERPROFILE%\Desktop" set "DESKTOP_TARGET=%USERPROFILE%\Desktop"
 if not defined DESKTOP_TARGET if exist "%USERPROFILE%\OneDrive\Desktop" set "DESKTOP_TARGET=%USERPROFILE%\OneDrive\Desktop"
 if not defined DESKTOP_TARGET if exist "%PUBLIC%\Desktop" set "DESKTOP_TARGET=%PUBLIC%\Desktop"
 
-if defined DESKTOP_TARGET (
-  copy /Y "%START_SCRIPT%" "%DESKTOP_TARGET%\PDV - Iniciar.bat" >nul 2>&1
-  copy /Y "%STOP_SCRIPT%" "%DESKTOP_TARGET%\PDV - Parar.bat" >nul 2>&1
-  if errorlevel 1 (
-    echo [AVISO] Nao foi possivel copiar atalhos .bat para a Area de Trabalho.
-  ) else (
-    echo Atalhos .bat criados em: %DESKTOP_TARGET%
-  )
-) else (
-  echo [AVISO] Nao foi possivel localizar a Area de Trabalho para copiar atalhos.
-)
-
-:: Tenta criar atalhos .lnk (opcional)
+:: Cria atalho .lnk (unico) apontando para o script dentro da pasta do app
 if defined DESKTOP_TARGET (
   powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "$ws = New-Object -ComObject WScript.Shell; " ^
-  "$lnk1 = $ws.CreateShortcut('%DESKTOP_TARGET%\\PDV - Iniciar.lnk'); " ^
+  "$lnk1 = $ws.CreateShortcut('%DESKTOP_TARGET%\\PDV.lnk'); " ^
   "$lnk1.TargetPath = '%START_SCRIPT%'; $lnk1.WorkingDirectory = '%APP_DIR%'; " ^
-  "$lnk1.IconLocation = '%SystemRoot%\\System32\\shell32.dll,25'; $lnk1.Save(); " ^
-  "$lnk2 = $ws.CreateShortcut('%DESKTOP_TARGET%\\PDV - Parar.lnk'); " ^
-  "$lnk2.TargetPath = '%STOP_SCRIPT%'; $lnk2.WorkingDirectory = '%APP_DIR%'; " ^
-  "$lnk2.IconLocation = '%SystemRoot%\\System32\\shell32.dll,28'; $lnk2.Save();" >nul 2>&1
+  "$lnk1.IconLocation = '%SystemRoot%\\System32\\shell32.dll,25'; $lnk1.Save();" >nul 2>&1
   if errorlevel 1 (
-    echo [AVISO] Nao foi possivel criar atalhos .lnk. Mantendo os .bat.
+    echo [AVISO] Nao foi possivel criar atalho .lnk na Area de Trabalho.
+    echo Voce pode iniciar manualmente por: %START_SCRIPT%
   ) else (
-    echo Atalhos .lnk criados em: %DESKTOP_TARGET%
+    echo Atalho criado em: %DESKTOP_TARGET%\\PDV.lnk
   )
+ ) else (
+  echo [AVISO] Nao foi possivel localizar a Area de Trabalho para criar atalho.
 )
 
 echo.
@@ -252,7 +226,6 @@ echo =====================================================
 echo.
 echo Pasta: %APP_DIR%
 echo Inicio: %START_SCRIPT%
-echo Parar : %STOP_SCRIPT%
 echo.
 echo Acesso local apos iniciar:
 echo http://localhost:3000

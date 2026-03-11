@@ -10,7 +10,8 @@ function normalizarOpcoesJson(input) {
     const cleaned = value
       .map((o) => ({
         nome: String(o?.nome || '').trim(),
-        extra: Number.parseFloat(o?.extra || 0) || 0
+        extra: Number.parseFloat(o?.extra || 0) || 0,
+        consumo: Math.max(1, Number(o?.consumo || 1))
       }))
       .filter((o) => o.nome);
     if (!cleaned.length) return null;
