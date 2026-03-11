@@ -523,7 +523,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const arr = JSON.parse(prod?.opcoes_json || '[]');
       if (!Array.isArray(arr)) return [];
       return arr
-        .map((o) => ({ nome: String(o?.nome || '').trim(), extra: Number(o?.extra || 0) || 0 }))
+        .map((o) => ({
+          nome: String(o?.nome || '').trim(),
+          extra: Number(o?.extra || 0) || 0,
+          consumo: Math.max(1, Number(o?.consumo || 1))
+        }))
         .filter((o) => o.nome);
     } catch {
       return [];
@@ -532,28 +536,39 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function escolherOpcaoProduto(prod) {
     const opcoes = parseOpcoesProduto(prod);
-    if (!opcoes.length) return { observacoes: null, preco: Number(prod.preco || 0) };
+    if (!opcoes.length) return { observacoes: null, preco: Number(prod.preco || 0), consumo: 1 };
     const idx = ui.choose
       ? await ui.choose({
           title: `Variação - ${prod.nome}`,
           message: 'Selecione uma opção para adicionar na comanda.',
           okLabel: 'Adicionar',
-          items: opcoes.map((o, index) => ({
-            value: index,
-            label: o.nome,
-            meta: `${o.extra >= 0 ? '+' : ''}${formatarMoedaBR(o.extra)}`
-          }))
+          items: [
+            {
+              value: -1,
+              label: 'Normal',
+              meta: `${formatarMoedaBR(Number(prod.preco || 0))} • consumo 1x`
+            },
+            ...opcoes.map((o, index) => ({
+              value: index,
+              label: o.nome,
+              meta: `${o.extra >= 0 ? '+' : ''}${formatarMoedaBR(o.extra)} • consumo ${o.consumo}x`
+            }))
+          ]
         })
       : 0;
     if (idx === null || idx === undefined || !opcoes[idx]) return null;
+    if (idx === -1) {
+      return { observacoes: null, preco: Number(prod.preco || 0), consumo: 1 };
+    }
     const sel = opcoes[idx];
     return {
       observacoes: sel.nome,
-      preco: Number(prod.preco || 0) + Number(sel.extra || 0)
+      preco: Number(prod.preco || 0) + Number(sel.extra || 0),
+      consumo: Math.max(1, Number(sel.consumo || 1))
     };
   }
 
-  function adicionarLinhaVariacao(nome = '', extra = 0) {
+  function adicionarLinhaVariacao(nome = '', extra = 0, consumo = 1) {
     const list = document.getElementById('variacoesList');
     if (!list) return;
     const row = document.createElement('div');
@@ -561,6 +576,7 @@ document.addEventListener('DOMContentLoaded', () => {
     row.innerHTML = `
       <input type="text" class="variacao-nome" placeholder="Ex: 300ml, 500ml, 1L" value="${String(nome || '').replace(/"/g, '&quot;')}">
       <input type="number" step="0.01" class="variacao-extra" placeholder="Extra" value="${Number(extra || 0)}">
+      <input type="number" step="1" min="1" class="variacao-consumo" placeholder="Consumo" value="${Number(consumo || 1)}">
       <button type="button" class="btn-rem">x</button>
     `;
     row.querySelector('.btn-rem')?.addEventListener('click', () => row.remove());
@@ -575,7 +591,13 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const arr = JSON.parse(opcoesJson);
       if (!Array.isArray(arr)) return;
-      arr.forEach((o) => adicionarLinhaVariacao(String(o?.nome || '').trim(), Number(o?.extra || 0)));
+      arr.forEach((o) =>
+        adicionarLinhaVariacao(
+          String(o?.nome || '').trim(),
+          Number(o?.extra || 0),
+          Math.max(1, Number(o?.consumo || 1))
+        )
+      );
     } catch {
       // noop
     }
@@ -588,7 +610,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const arr = rows
       .map((row) => ({
         nome: String(row.querySelector('.variacao-nome')?.value || '').trim(),
-        extra: Number.parseFloat(String(row.querySelector('.variacao-extra')?.value || '0').replace(',', '.')) || 0
+        extra: Number.parseFloat(String(row.querySelector('.variacao-extra')?.value || '0').replace(',', '.')) || 0,
+        consumo: Math.max(1, Number(row.querySelector('.variacao-consumo')?.value || 1))
       }))
       .filter((x) => x.nome);
     return arr.length ? JSON.stringify(arr) : null;
@@ -668,7 +691,8 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
           await API.adicionarItem(venda.id, it.produto_id, it.quantidade, {
             observacoes: it.observacoes || null,
-            preco_unitario_override: it.preco
+            preco_unitario_override: it.preco,
+            consumo_estoque: it.consumo_estoque || it.consumo || 1
           });
         }
       }
@@ -700,14 +724,24 @@ document.addEventListener('DOMContentLoaded', () => {
       const prodId = String(prod.produto_id);
       const keyObs = String(prod.observacoes || '').trim();
       const keyPreco = Number(prod.preco || 0);
+      const keyConsumo = Number(prod.consumo_estoque || prod.consumo || 1);
       const ex = carrinho.find(
-        (i) => String(i.produto_id) === prodId && String(i.observacoes || '').trim() === keyObs && Number(i.preco || 0) === keyPreco
+        (i) =>
+          String(i.produto_id) === prodId &&
+          String(i.observacoes || '').trim() === keyObs &&
+          Number(i.preco || 0) === keyPreco &&
+          Number(i.consumo_estoque || i.consumo || 1) === keyConsumo
       );
       if (ex) {
         ex.quantidade++;
         ex.subtotal = ex.quantidade * ex.preco;
       } else {
-        carrinho.push({ ...prod, quantidade: 1, subtotal: prod.preco });
+        carrinho.push({
+          ...prod,
+          consumo_estoque: keyConsumo,
+          quantidade: 1,
+          subtotal: prod.preco
+        });
       }
     }
     atualizarCarrinhoUI();
@@ -1045,7 +1079,8 @@ document.addEventListener('DOMContentLoaded', () => {
           if (opcao === null) return;
           await API.adicionarItem(currentMesa.id, pid, 1, {
             observacoes: opcao.observacoes || null,
-            preco_unitario_override: opcao.preco
+            preco_unitario_override: opcao.preco,
+            consumo_estoque: opcao.consumo || 1
           });
           const updated = await API.obterVenda(currentMesa.id);
           currentMesa = updated;
@@ -1177,7 +1212,8 @@ document.addEventListener('DOMContentLoaded', () => {
           produto_id: card.dataset.id,
           nome: card.dataset.nome,
           preco: opcao.preco,
-          observacoes: opcao.observacoes || null
+          observacoes: opcao.observacoes || null,
+          consumo_estoque: opcao.consumo || 1
         });
       });
     });

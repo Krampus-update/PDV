@@ -177,6 +177,17 @@ set "STOP_SCRIPT=%APP_DIR%\PARAR_PDV.bat"
   echo @echo off
   echo setlocal EnableExtensions
   echo title PDV - Servidor
+  echo cd /d "%%~dp0"
+  echo if exist ".git" ^(
+  echo   where git ^>nul 2^>^&1
+  echo   if errorlevel 1 ^(
+  echo     echo [AVISO] Git nao encontrado. Pulando atualizacao.
+  echo   ^) else ^(
+  echo     echo Atualizando codigo do PDV...
+  echo     git pull --rebase --autostash
+  echo     if errorlevel 1 echo [AVISO] Falha ao atualizar via git.
+  echo   ^)
+  echo ^)
   echo cd /d "%%~dp0backend"
   echo if not exist logs mkdir logs ^>nul 2^>^&1
   echo echo Iniciando servidor PDV...
@@ -215,6 +226,23 @@ if defined DESKTOP_TARGET (
   )
 ) else (
   echo [AVISO] Nao foi possivel localizar a Area de Trabalho para copiar atalhos.
+)
+
+:: Tenta criar atalhos .lnk (opcional)
+if defined DESKTOP_TARGET (
+  powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+  "$ws = New-Object -ComObject WScript.Shell; " ^
+  "$lnk1 = $ws.CreateShortcut('%DESKTOP_TARGET%\\PDV - Iniciar.lnk'); " ^
+  "$lnk1.TargetPath = '%START_SCRIPT%'; $lnk1.WorkingDirectory = '%APP_DIR%'; " ^
+  "$lnk1.IconLocation = '%SystemRoot%\\System32\\shell32.dll,25'; $lnk1.Save(); " ^
+  "$lnk2 = $ws.CreateShortcut('%DESKTOP_TARGET%\\PDV - Parar.lnk'); " ^
+  "$lnk2.TargetPath = '%STOP_SCRIPT%'; $lnk2.WorkingDirectory = '%APP_DIR%'; " ^
+  "$lnk2.IconLocation = '%SystemRoot%\\System32\\shell32.dll,28'; $lnk2.Save();" >nul 2>&1
+  if errorlevel 1 (
+    echo [AVISO] Nao foi possivel criar atalhos .lnk. Mantendo os .bat.
+  ) else (
+    echo Atalhos .lnk criados em: %DESKTOP_TARGET%
+  )
 )
 
 echo.

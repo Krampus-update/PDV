@@ -1436,9 +1436,20 @@ textarea:focus {
 
 .variacao-row {
     display: grid;
-    grid-template-columns: 1fr 110px 40px;
+    grid-template-columns: 1fr 90px 90px 40px;
     gap: 6px;
     align-items: center;
+}
+
+.variacao-row input {
+    height: 36px;
+    font-size: 12px;
+    padding: 6px 8px;
+}
+
+.variacao-row .variacao-extra,
+.variacao-row .variacao-consumo {
+    text-align: center;
 }
 
 .variacao-row .btn-rem {

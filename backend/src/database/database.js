@@ -188,6 +188,7 @@ function tenantSchemaQueries() {
       produto_id INTEGER NOT NULL,
       quantidade INTEGER NOT NULL,
       preco_unitario DECIMAL(10, 2) NOT NULL,
+      consumo_estoque INTEGER NOT NULL DEFAULT 1,
       subtotal DECIMAL(10, 2) NOT NULL,
       observacoes TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -392,6 +393,10 @@ async function initializeTenantDatabase(code) {
   }
   if (!cols.some((c) => c.name === 'pix_chave_utilizada')) {
     await runQuery(db, 'ALTER TABLE vendas ADD COLUMN pix_chave_utilizada TEXT');
+  }
+  const itensCols = await dbAll("PRAGMA table_info(venda_itens)", [], code);
+  if (!itensCols.some((c) => c.name === 'consumo_estoque')) {
+    await runQuery(db, 'ALTER TABLE venda_itens ADD COLUMN consumo_estoque INTEGER NOT NULL DEFAULT 1');
   }
   if (!cols.some((c) => c.name === 'promocao_aplicada_id')) {
     await runQuery(db, 'ALTER TABLE vendas ADD COLUMN promocao_aplicada_id INTEGER');

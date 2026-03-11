@@ -407,6 +407,8 @@ class VendaController {
     try {
       const { id } = req.params;
       const { produto_id, quantidade, observacoes, preco_unitario_override } = req.body;
+      const consumoRaw = req.body?.consumo_estoque ?? req.body?.estoque_consumo ?? 1;
+      const consumo = Math.max(1, Number(consumoRaw || 1));
 
       if (!produto_id || !quantidade) {
         return res.status(400).json({ error: 'produto_id e quantidade são obrigatórios' });
@@ -466,14 +468,15 @@ class VendaController {
         (i) =>
           String(i.produto_id) === String(produto_id) &&
           Number(i.preco_unitario) === Number(precoUnitario) &&
-          String(i.observacoes || '').trim() === String(obsNorm || '').trim()
+          String(i.observacoes || '').trim() === String(obsNorm || '').trim() &&
+          Number(i.consumo_estoque || 1) === Number(consumo || 1)
       );
       if(existente){
         const novaQtd = existente.quantidade + qtd;
         const novoSubtotal = existente.preco_unitario * novaQtd;
         await VendaItemModel.atualizar(existente.id, { quantidade: novaQtd, subtotal: novoSubtotal });
         if(!avulso){
-          await ProdutoModel.atualizarEstoque(produto_id, -qtd);
+          await ProdutoModel.atualizarEstoque(produto_id, -(qtd * consumo));
         }
         await VendaModel.obterTotal(id);
         await VendaController.aplicarPromocaoAutomaticaSeElegivel(id);
@@ -511,13 +514,14 @@ class VendaController {
         produto_id,
         quantidade: qtd,
         preco_unitario: precoUnitario,
+        consumo_estoque: consumo,
         subtotal,
         observacoes: obsNorm
       });
 
       // Baixar estoque apenas se não tratar-se de avulso
       if(!avulso){
-        await ProdutoModel.atualizarEstoque(produto_id, -qtd);
+        await ProdutoModel.atualizarEstoque(produto_id, -(qtd * consumo));
       }
 
       // Atualizar total da venda
@@ -558,7 +562,8 @@ class VendaController {
       }
 
       // Devolver estoque
-      await ProdutoModel.atualizarEstoque(item.produto_id, item.quantidade);
+      const consumo = Math.max(1, Number(item.consumo_estoque || 1));
+      await ProdutoModel.atualizarEstoque(item.produto_id, item.quantidade * consumo);
 
       // Remover item
       await VendaItemModel.deletar(item_id);
@@ -607,12 +612,13 @@ class VendaController {
       const isAvulso = produto.nome.includes('Avulso') && produto.estoque >= 9999;
       if (!isAvulso) {
         const diferenca = quantidade - item.quantidade;
-        if (diferenca > 0 && produto.estoque < diferenca) {
+        const consumo = Math.max(1, Number(item.consumo_estoque || 1));
+        if (diferenca > 0 && produto.estoque < diferenca * consumo) {
           return res.status(400).json({ error: 'Estoque insuficiente' });
         }
         // Ajustar estoque: se aumenta quantidade, baixa estoque; se diminui, devolve
         if (diferenca !== 0) {
-          await ProdutoModel.atualizarEstoque(item.produto_id, -diferenca);
+          await ProdutoModel.atualizarEstoque(item.produto_id, -(diferenca * consumo));
         }
       }
 

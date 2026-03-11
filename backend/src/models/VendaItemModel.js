@@ -3,13 +3,14 @@ import { dbRun, dbGet, dbAll } from '../database/database.js';
 class VendaItemModel {
   static async criar(dados) {
     const result = await dbRun(
-      `INSERT INTO venda_itens (venda_id, produto_id, quantidade, preco_unitario, subtotal, observacoes) 
-       VALUES (?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO venda_itens (venda_id, produto_id, quantidade, preco_unitario, consumo_estoque, subtotal, observacoes) 
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [
         dados.venda_id,
         dados.produto_id,
         dados.quantidade,
         dados.preco_unitario,
+        dados.consumo_estoque || 1,
         dados.subtotal,
         dados.observacoes || null
       ]
@@ -41,6 +42,10 @@ class VendaItemModel {
         fields.push(`${key} = ?`);
         values.push(value);
       }
+      if (key === 'consumo_estoque') {
+        fields.push('consumo_estoque = ?');
+        values.push(value);
+      }
     }
 
     if (fields.length === 0) return 0;
@@ -64,6 +69,7 @@ class VendaItemModel {
         vi.id,
         vi.quantidade,
         vi.preco_unitario,
+        vi.consumo_estoque,
         vi.subtotal,
         vi.observacoes,
         p.id as produto_id,
