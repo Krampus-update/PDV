@@ -11,7 +11,8 @@ import {
 class ImpressaoController {
   static async obterConfig(req, res) {
     try {
-      const config = await obterConfiguracao();
+      const destino = String(req.query?.tipo || req.query?.destino || 'balcao');
+      const config = await obterConfiguracao(destino);
       res.json(config);
     } catch (error) {
       console.error('Erro ao obter config de impressao:', error);
@@ -21,7 +22,7 @@ class ImpressaoController {
 
   static async salvarConfig(req, res) {
     try {
-      const config = await salvarConfiguracao(req.body || {});
+      const config = await salvarConfiguracao({ ...(req.body || {}), destino: req.body?.destino || req.query?.tipo });
       res.json({ message: 'Configuração de impressora atualizada', config });
     } catch (error) {
       console.error('Erro ao salvar config de impressao:', error);
@@ -31,7 +32,8 @@ class ImpressaoController {
 
   static async teste(req, res) {
     try {
-      const config = await imprimirTeste();
+      const destino = String(req.query?.tipo || req.query?.destino || 'balcao');
+      const config = await imprimirTeste(destino);
       res.json({ message: 'Teste enviado para impressora', config });
     } catch (error) {
       console.error('Erro ao imprimir teste:', error);

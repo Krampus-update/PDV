@@ -4,6 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <title>PDV - Painel</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0f172a">
   <link rel="stylesheet" href="css/global.css">
   <style>
     .hidden { display: none !important; }
@@ -173,6 +175,57 @@
     }
 
     .mesa-item:last-child { border-bottom: none; }
+
+    .sidebar-tabs {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+    .sidebar-tab {
+      flex: 1;
+      border: 1px solid #e2e8f0;
+      background: #f8fafc;
+      color: #475569;
+      border-radius: 8px;
+      padding: 6px 10px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .sidebar-tab.active {
+      background: #e8f2ff;
+      border-color: var(--primary);
+      color: #1e3a8a;
+      font-weight: 600;
+    }
+    .sidebar-tab-content.hidden { display: none !important; }
+    .category-suggest {
+      position: relative;
+    }
+    .category-suggest-list {
+      position: absolute;
+      top: 100%;
+      left: 0;
+      right: 0;
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      box-shadow: 0 10px 20px rgba(15, 23, 42, 0.08);
+      max-height: 180px;
+      overflow: auto;
+      z-index: 5;
+      display: none;
+    }
+    .category-suggest-item {
+      padding: 8px 10px;
+      font-size: 12px;
+      cursor: pointer;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .category-suggest-item:hover {
+      background: #f8fafc;
+    }
   </style>
 </head>
 <body class="app-page">
@@ -229,6 +282,11 @@
               <label style="font-size:12px;color:#666">Mesa:</label>
               <input type="text" id="mesa" placeholder="Ex: 1, A, VIP" style="font-size:12px;padding:8px;width:100%" />
             </div>
+            <div style="margin-bottom:8px;">
+              <label style="font-size:12px;color:#666">Cliente:</label>
+              <button id="btnSelecionarClienteComanda" class="btn btn-secondary btn-soft" type="button" style="width:100%;font-size:12px">Selecionar cliente</button>
+              <div id="clienteComandaResumo" style="font-size:11px;color:#64748b;margin-top:6px">Nenhum cliente vinculado.</div>
+            </div>
             <div class="cart-section" id="carrinhoItens">
               <p style="color:#666;margin:0;font-size:12px">Clique em um produto</p>
             </div>
@@ -259,22 +317,34 @@
         <div class="main-content">
           <h2>Estoque e Cardápio</h2>
           <div class="main-content-scroll">
-            <input type="text" id="buscaProdutoEstoque" placeholder="Buscar produto por nome/categoria" style="margin-bottom:10px;">
+            <div style="display:grid;grid-template-columns:1fr 180px;gap:8px;margin-bottom:10px">
+              <input type="text" id="buscaProdutoEstoque" placeholder="Buscar produto por nome/categoria" style="margin-bottom:0;">
+              <select id="filtroCategoriaEstoque" style="font-size:12px;padding:8px">
+                <option value="todas">Todas categorias</option>
+              </select>
+            </div>
             <div id="prodList" class="product-list"></div>
           </div>
         </div>
 
         <div class="sidebar" id="sideProdutos">
-          <div class="sidebar-section">
-            <h3>Novo Produto</h3>
+          <div class="sidebar-tabs">
+            <button class="sidebar-tab active" type="button" data-tab="produto">Produto</button>
+            <button class="sidebar-tab" type="button" data-tab="categoria">Categoria</button>
+          </div>
+          <div class="sidebar-tab-content" id="tabProduto">
+            <div class="sidebar-section">
+              <h3>Novo Produto</h3>
             <input type="text" id="novoProdutoNome" placeholder="Nome" style="font-size:12px;padding:8px;margin-bottom:8px;width:100%" />
             <label style="font-size:12px;margin-bottom:4px;display:block;color:#666">Preço</label>
             <div id="displayPreco" class="display-value" style="font-size:16px;margin-bottom:8px">R$ 0,00</div>
             <div id="precoTeclado" class="numeric-pad" style="grid-template-columns:repeat(3,1fr);gap:4px;margin-bottom:8px"></div>
             <input type="number" id="novoProdutoEstoque" placeholder="Estoque" value="0" style="font-size:12px;padding:8px;margin-bottom:8px;width:100%" />
             <label style="font-size:12px;margin-bottom:4px;display:block;color:#666">Categoria</label>
-            <input list="categoriasList" type="text" id="novoProdutoCategoria" placeholder="Ex: bebidas, comidas, sobremesas" style="font-size:12px;padding:8px;margin-bottom:8px;width:100%" />
-            <datalist id="categoriasList"></datalist>
+            <div class="category-suggest" style="margin-bottom:8px">
+              <input type="text" id="novoProdutoCategoria" placeholder="Ex: bebidas, comidas, sobremesas" style="font-size:12px;padding:8px;width:100%" autocomplete="off" />
+              <div id="categoriaSuggestList" class="category-suggest-list"></div>
+            </div>
             <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#666;margin-bottom:8px">
               <input type="checkbox" id="novoProdutoDestaque" style="width:auto">
               Destacar no cardápio (promoção)
@@ -293,6 +363,24 @@
             <img id="previewImagem" style="max-width:100%;max-height:80px;display:none;margin-bottom:6px;border-radius:4px" />
             <button id="btnCriarProduto" class="btn btn-primary btn-block" style="font-size:12px;padding:10px">Criar Produto</button>
             <button id="btnCancelarEdicao" class="btn secondary btn-block" style="font-size:12px;padding:10px;display:none;margin-top:8px">Cancelar</button>
+            </div>
+          </div>
+          <div class="sidebar-tab-content hidden" id="tabCategoria">
+            <div class="sidebar-section">
+              <h3>Categorias</h3>
+              <div id="listaCategorias" class="product-list" style="max-height:200px;overflow:auto;margin-bottom:8px"></div>
+              <input type="text" id="categoriaNome" placeholder="Nome da categoria" style="font-size:12px;padding:8px;margin-bottom:8px;width:100%" />
+              <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#666;margin-bottom:8px">
+                <input type="checkbox" id="categoriaAtiva" style="width:auto" checked>
+                Ativa
+              </label>
+              <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#666;margin-bottom:8px">
+                <input type="checkbox" id="categoriaVaiCozinha" style="width:auto">
+                Enviar toda categoria para cozinha
+              </label>
+              <button id="btnSalvarCategoria" class="btn btn-secondary btn-block" style="font-size:12px;padding:8px">Salvar Categoria</button>
+              <button id="btnCancelarCategoria" class="btn secondary btn-block" style="font-size:12px;padding:8px;display:none;margin-top:6px">Cancelar</button>
+            </div>
           </div>
         </div>
       </div>
@@ -374,9 +462,12 @@
             <textarea id="promoDescricao" placeholder="Descrição (opcional)" style="min-height:70px;margin-bottom:8px"></textarea>
             <select id="promoTipo" style="margin-bottom:8px">
               <option value="combo_produto">Combo de produto</option>
+              <option value="combo_categoria">Combo por categoria</option>
             </select>
             <label style="font-size:12px;color:#64748b;margin-bottom:4px;display:block">Produto</label>
             <select id="promoProdutoId" style="margin-bottom:8px"></select>
+            <label id="promoCategoriaLabel" style="font-size:12px;color:#64748b;margin-bottom:4px;display:none">Categoria</label>
+            <select id="promoCategoria" style="margin-bottom:8px;display:none"></select>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
               <div>
                 <label style="font-size:12px;color:#64748b;margin-bottom:4px;display:block">Quantidade</label>
@@ -473,12 +564,19 @@
         </div>
       </div>
       <div id="fechDivisaoPreview" class="cart-section" style="max-height:140px"></div>
-      <div id="fechPixBox" class="hidden" style="border:1px solid #e2e8f0;border-radius:10px;padding:10px;background:#f8fafc">
-        <div style="display:flex;gap:10px;align-items:flex-start">
-          <img id="fechPixQr" alt="QR PIX" style="width:140px;height:140px;border-radius:8px;border:1px solid #dbe3ef;background:#fff;object-fit:contain">
+      <div id="fechPixBox" class="hidden" style="border:1px solid #c7d2fe;border-radius:14px;padding:14px;background:linear-gradient(180deg,#eff6ff,#fff);box-shadow:0 10px 26px rgba(37,99,235,.08);margin-top:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <div>
+            <div style="font-size:12px;font-weight:800;color:#1d4ed8">Pagamento PIX</div>
+            <div style="font-size:11px;color:#64748b">Mostre o QR ao cliente e copie a chave se precisar.</div>
+          </div>
+          <button id="btnCopiarPix" type="button" class="btn btn-secondary btn-soft" style="padding:6px 10px;font-size:11px">Copiar código</button>
+        </div>
+        <div style="display:grid;grid-template-columns:190px 1fr;gap:12px;align-items:start">
+          <img id="fechPixQr" alt="QR PIX" style="width:190px;height:190px;border-radius:12px;border:1px solid #dbe3ef;background:#fff;object-fit:contain;padding:6px">
           <div style="flex:1">
-            <div style="font-size:12px;font-weight:700;margin-bottom:4px">PIX copia e cola</div>
-            <textarea id="fechPixPayload" readonly style="min-height:120px"></textarea>
+            <div style="font-size:12px;font-weight:700;margin-bottom:6px">PIX copia e cola</div>
+            <textarea id="fechPixPayload" readonly style="min-height:180px;font-size:11px;font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"></textarea>
           </div>
         </div>
       </div>

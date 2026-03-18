@@ -10,6 +10,10 @@ function normalizeText(v, max = 99) {
   return txt.slice(0, max);
 }
 
+function isImageDataUrl(v) {
+  return /^data:image\/[a-zA-Z0-9.+-]+;base64,/.test(String(v || '').trim());
+}
+
 function normalizePixNameOrCity(v, max) {
   return String(v || '')
     .normalize('NFD')
@@ -82,8 +86,8 @@ function normalizeTxid(value) {
   return v || '***';
 }
 
-function buildPixPayload({ chave, nome, cidade, valor, txid, descricao }) {
-  const merchant = field('00', 'BR.GOV.BCB.PIX') + field('01', chave) + (descricao ? field('02', descricao) : '');
+function buildPixPayload({ chave, nome, cidade, valor, txid }) {
+  const merchant = field('00', 'BR.GOV.BCB.PIX') + field('01', chave);
   const txidNorm = normalizeTxid(txid);
   const payloadSemCRC = [
     field('00', '01'),
@@ -111,7 +115,8 @@ async function obterConfigPix() {
     chave: String(map.pix_chave || '').trim(),
     nome_recebedor: normalizePixNameOrCity(map.pix_nome_recebedor || '', 25),
     cidade: normalizePixNameOrCity(map.pix_cidade || 'SAO PAULO', 15),
-    descricao_padrao: normalizeText(map.pix_descricao_padrao || 'Pagamento PDV', 50)
+    descricao_padrao: normalizeText(map.pix_descricao_padrao || 'Pagamento PDV', 50),
+    qr_imagem: isImageDataUrl(map.pix_qr_imagem || '') ? String(map.pix_qr_imagem).trim() : ''
   };
 }
 
@@ -122,8 +127,12 @@ async function salvarConfigPix(parcial = {}) {
     chave: String(parcial.chave ?? atual.chave ?? '').trim(),
     nome_recebedor: normalizePixNameOrCity(parcial.nome_recebedor ?? atual.nome_recebedor ?? '', 25),
     cidade: normalizePixNameOrCity(parcial.cidade ?? atual.cidade ?? 'SAO PAULO', 15),
-    descricao_padrao: normalizeText(parcial.descricao_padrao ?? atual.descricao_padrao ?? 'Pagamento PDV', 50)
+    descricao_padrao: normalizeText(parcial.descricao_padrao ?? atual.descricao_padrao ?? 'Pagamento PDV', 50),
+    qr_imagem: String(parcial.qr_imagem ?? atual.qr_imagem ?? '').trim()
   };
+  if (next.qr_imagem && !isImageDataUrl(next.qr_imagem)) {
+    throw new Error('QR code PIX inválido. Envie uma imagem em base64 (data URL).');
+  }
   if (next.habilitado) {
     const validacao = validarChavePix(next.chave);
     if (!validacao.ok) {
@@ -135,7 +144,8 @@ async function salvarConfigPix(parcial = {}) {
     ConfiguracaoModel.definir('pix_chave', next.chave),
     ConfiguracaoModel.definir('pix_nome_recebedor', next.nome_recebedor),
     ConfiguracaoModel.definir('pix_cidade', next.cidade),
-    ConfiguracaoModel.definir('pix_descricao_padrao', next.descricao_padrao)
+    ConfiguracaoModel.definir('pix_descricao_padrao', next.descricao_padrao),
+    ConfiguracaoModel.definir('pix_qr_imagem', next.qr_imagem || '')
   ]);
   return next;
 }
@@ -162,8 +172,7 @@ async function gerarPixCobranca({ vendaId, valor, descricao = '' }) {
     nome: cfg.nome_recebedor || 'RECEBEDOR',
     cidade: cfg.cidade || 'SAO PAULO',
     valor: Number(valor || 0),
-    txid,
-    descricao: ''
+    txid
   });
   const qr_data_url = await QRCode.toDataURL(payload, { margin: 1, width: 320 });
   return {
@@ -175,4 +184,4 @@ async function gerarPixCobranca({ vendaId, valor, descricao = '' }) {
   };
 }
 
-export { obterConfigPix, salvarConfigPix, gerarPixCobranca, validarChavePix };
+export { obterConfigPix, salvarConfigPix, gerarPixCobranca, validarChavePix, buildPixPayload };

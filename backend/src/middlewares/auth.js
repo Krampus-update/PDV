@@ -1,5 +1,6 @@
 import { DEV_LOGIN } from '../services/devAccessService.js';
 import UsuarioModel from '../models/UsuarioModel.js';
+import { runWithTenant, sanitizeTenantCode } from '../database/database.js';
 
 const ROLE_LEVEL = {
   funcionario: 1,
@@ -26,7 +27,11 @@ async function authOptional(req, res, next) {
     const auth = req.headers.authorization || '';
     const token = auth.startsWith('Bearer ') ? auth.slice(7).trim() : null;
     if (!token) return next();
-    const sessao = await UsuarioModel.obterSessaoValida(token);
+    const rawTenant = req.headers['x-tenant-code'] || req.body?.restaurante || req.body?.restaurante_codigo || req.query?.restaurante;
+    const tenantCode = rawTenant ? sanitizeTenantCode(rawTenant) : null;
+    const sessao = tenantCode
+      ? await runWithTenant(tenantCode, () => UsuarioModel.obterSessaoValida(token))
+      : await UsuarioModel.obterSessaoValida(token);
     if (sessao) {
       const role = sessao.login === DEV_LOGIN ? 'dev' : normalizeRole(sessao.role);
       req.user = {
@@ -36,6 +41,9 @@ async function authOptional(req, res, next) {
         role,
         is_dev: role === 'dev' || sessao.login === DEV_LOGIN
       };
+      req.sessionToken = token;
+      req.sessionExpiresAt = sessao.expires_at;
+      if (tenantCode) req.tenantCode = tenantCode;
     }
     next();
   } catch (error) {

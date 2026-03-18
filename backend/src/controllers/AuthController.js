@@ -181,7 +181,31 @@ class AuthController {
 
   static async me(req, res) {
     if (!req.user) return res.status(401).json({ error: 'Não autenticado' });
-    res.json({ usuario: req.user, restaurante: req.tenantCode });
+    res.json({
+      usuario: req.user,
+      restaurante: req.tenantCode,
+      session: {
+        token: req.sessionToken || null,
+        expires_at: req.sessionExpiresAt || null
+      }
+    });
+  }
+
+  static async refresh(req, res) {
+    try {
+      if (!req.user || !req.sessionToken) {
+        return res.status(401).json({ error: 'Não autenticado' });
+      }
+      const refreshHoras = req.user.is_dev ? 24 : 12;
+      const sessao = await UsuarioModel.renovarSessao(req.sessionToken, refreshHoras);
+      if (!sessao) {
+        return res.status(401).json({ error: 'Sessão inválida' });
+      }
+      res.json({ message: 'Sessão renovada', expires_at: sessao.expires_at });
+    } catch (error) {
+      console.error('Erro ao renovar sessão:', error);
+      res.status(500).json({ error: error.message });
+    }
   }
 
   static async logout(req, res) {
@@ -291,7 +315,7 @@ class AuthController {
         return res.status(403).json({ error: 'Você não pode remover esse usuário' });
       }
 
-      await UsuarioModel.desativarUsuario(id);
+      await UsuarioModel.removerUsuario(id);
       await UsuarioModel.removerSessoesUsuario(id);
       res.json({ message: 'Usuário removido com sucesso' });
     } catch (error) {

@@ -55,8 +55,8 @@
 
     const role = String(user.role || '').toLowerCase();
     const allowed = {
-      dev: new Set(['painel.html', 'garcom.html', 'producao.html', 'configuracoes.html', 'admin.html', 'index.html']),
-      gerente: new Set(['painel.html', 'garcom.html', 'producao.html', 'configuracoes.html', 'admin.html', 'index.html']),
+      dev: new Set(['painel.html', 'garcom.html', 'producao.html', 'configuracoes.html', 'admin.html', 'index.html', 'gerente.html', 'dev.html']),
+      gerente: new Set(['painel.html', 'garcom.html', 'producao.html', 'configuracoes.html', 'admin.html', 'index.html', 'gerente.html']),
       funcionario: new Set(['painel.html', 'garcom.html', 'producao.html'])
     };
     const allowedPages = allowed[role] || allowed.funcionario;
@@ -66,6 +66,10 @@
     }
 
     localStorage.setItem('pdv_user', JSON.stringify(user));
+    const sessionExpiresAt = me?.session?.expires_at ? new Date(me.session.expires_at).getTime() : 0;
+    if (sessionExpiresAt && sessionExpiresAt - Date.now() < 2 * 60 * 60 * 1000) {
+      API.refreshSession().catch(() => null);
+    }
     if (page === 'index.html') {
       window.location.href = 'admin.html';
       return;

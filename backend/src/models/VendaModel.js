@@ -93,7 +93,8 @@ class VendaModel {
        FROM vendas v
        JOIN venda_itens vi ON vi.venda_id = v.id
        JOIN produtos p ON p.id = vi.produto_id
-       WHERE v.status = 'em_preparo' AND p.vai_cozinha = 1
+       LEFT JOIN categorias c ON c.nome = p.categoria
+       WHERE v.status = 'em_preparo' AND (p.vai_cozinha = 1 OR c.vai_cozinha = 1)
        ORDER BY v.created_at ASC`
     );
   }
@@ -104,7 +105,8 @@ class VendaModel {
        FROM vendas v
        JOIN venda_itens vi ON vi.venda_id = v.id
        JOIN produtos p ON p.id = vi.produto_id
-       WHERE v.status = ? AND p.vai_cozinha = 1
+       LEFT JOIN categorias c ON c.nome = p.categoria
+       WHERE v.status = ? AND (p.vai_cozinha = 1 OR c.vai_cozinha = 1)
        ORDER BY v.created_at ASC`,
       [status]
     );

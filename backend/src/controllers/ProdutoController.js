@@ -1,4 +1,5 @@
 import ProdutoModel from '../models/ProdutoModel.js';
+import CategoriaModel from '../models/CategoriaModel.js';
 import HistoricoModel from '../models/HistoricoModel.js';
 import { broadcast } from '../services/realtimeService.js';
 
@@ -11,7 +12,8 @@ function normalizarOpcoesJson(input) {
       .map((o) => ({
         nome: String(o?.nome || '').trim(),
         extra: Number.parseFloat(o?.extra || 0) || 0,
-        consumo: Math.max(1, Number(o?.consumo || 1))
+        consumo: Math.max(1, Number(o?.consumo || 1)),
+        estoque: o?.estoque === '' || o?.estoque === null || o?.estoque === undefined ? null : Math.max(0, Number.parseInt(o?.estoque, 10) || 0)
       }))
       .filter((o) => o.nome);
     if (!cleaned.length) return null;
@@ -43,13 +45,16 @@ class ProdutoController {
         return res.status(400).json({ error: 'Nome e preço são obrigatórios' });
       }
 
+      const categoriaNorm = String(categoria || 'geral').trim() || 'geral';
+      await CategoriaModel.garantir(categoriaNorm);
+
       const id = await ProdutoModel.criar({
         nome,
         preco: parseFloat(preco),
         estoque: parseInt(estoque) || 0,
         estoque_minimo: parseInt(estoque_minimo) || 0,
         tipo: tipo || 'simples',
-        categoria: String(categoria || 'geral').trim() || 'geral',
+        categoria: categoriaNorm,
         destaque: destaque === true || destaque === 1 || destaque === '1',
         popularidade: parseInt(popularidade, 10) || 0,
         opcoes_json: normalizarOpcoesJson(opcoes_json),
@@ -105,6 +110,7 @@ class ProdutoController {
       const dados = { ...req.body };
       if (Object.prototype.hasOwnProperty.call(dados, 'categoria')) {
         dados.categoria = String(dados.categoria || 'geral').trim() || 'geral';
+        await CategoriaModel.garantir(dados.categoria);
       }
       if (Object.prototype.hasOwnProperty.call(dados, 'vai_cozinha')) {
         dados.vai_cozinha = dados.vai_cozinha === true || dados.vai_cozinha === 1 || dados.vai_cozinha === '1';

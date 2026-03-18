@@ -24,9 +24,12 @@ class VendaItemModel {
 
   static async obterPorVenda(venda_id) {
     return dbAll(
-      `SELECT vi.*, p.nome as produto_nome, p.tipo as produto_tipo, p.vai_cozinha as produto_vai_cozinha
+      `SELECT vi.*, p.nome as produto_nome, p.tipo as produto_tipo,
+        CASE WHEN p.vai_cozinha = 1 OR c.vai_cozinha = 1 THEN 1 ELSE 0 END as produto_vai_cozinha,
+        p.categoria as produto_categoria
        FROM venda_itens vi 
-       JOIN produtos p ON vi.produto_id = p.id 
+       JOIN produtos p ON vi.produto_id = p.id
+       LEFT JOIN categorias c ON c.nome = p.categoria
        WHERE vi.venda_id = ? 
        ORDER BY vi.created_at`,
       [venda_id]
@@ -75,9 +78,11 @@ class VendaItemModel {
         p.id as produto_id,
         p.nome as produto_nome,
         p.tipo as produto_tipo,
-        p.vai_cozinha as produto_vai_cozinha
+        CASE WHEN p.vai_cozinha = 1 OR c.vai_cozinha = 1 THEN 1 ELSE 0 END as produto_vai_cozinha,
+        p.categoria as produto_categoria
        FROM venda_itens vi 
-       JOIN produtos p ON vi.produto_id = p.id 
+       JOIN produtos p ON vi.produto_id = p.id
+       LEFT JOIN categorias c ON c.nome = p.categoria
        WHERE vi.venda_id = ?`,
       [venda_id]
     );

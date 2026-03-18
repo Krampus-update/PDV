@@ -6,6 +6,7 @@ import produtosRoutes from './produtos.js';
 import vendasRoutes from './vendas.js';
 import historicoRoutes from './historico.js';
 import authRoutes from './auth.js';
+import categoriasRoutes from './categorias.js';
 import relatoriosRoutes from './relatorios.js';
 import backupRoutes from './backup.js';
 import impressaoRoutes from './impressao.js';
@@ -14,6 +15,7 @@ import caixaRoutes from './caixa.js';
 import pixRoutes from './pix.js';
 import pagamentosRoutes from './pagamentos.js';
 import promocoesRoutes from './promocoes.js';
+import devRoutes from './dev.js';
 
 const router = express.Router();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -38,6 +40,7 @@ router.get('/', (req, res) => {
       produtos: '/api/produtos',
       vendas: '/api/vendas',
       historico: '/api/historico',
+      categorias: '/api/categorias',
       auth: '/api/auth',
       relatorios: '/api/relatorios',
       backup: '/api/backup',
@@ -45,9 +48,9 @@ router.get('/', (req, res) => {
       clientes: '/api/clientes',
       caixa: '/api/caixa',
       pix: '/api/pix',
-      pagamentos: '/api/pagamentos'
-      ,
-      promocoes: '/api/promocoes'
+      pagamentos: '/api/pagamentos',
+      promocoes: '/api/promocoes',
+      dev: '/api/dev'
     }
   });
 });
@@ -56,6 +59,7 @@ router.get('/', (req, res) => {
 router.use('/produtos', produtosRoutes);
 router.use('/vendas', vendasRoutes);
 router.use('/historico', historicoRoutes);
+router.use('/categorias', categoriasRoutes);
 router.use('/auth', authRoutes);
 router.use('/relatorios', relatoriosRoutes);
 router.use('/backup', backupRoutes);
@@ -65,6 +69,7 @@ router.use('/caixa', caixaRoutes);
 router.use('/pix', pixRoutes);
 router.use('/pagamentos', pagamentosRoutes);
 router.use('/promocoes', promocoesRoutes);
+router.use('/dev', devRoutes);
 
 // Health check
 router.get('/status', (req, res) => {

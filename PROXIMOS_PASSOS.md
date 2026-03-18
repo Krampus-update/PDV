@@ -2,8 +2,8 @@
 
 ## 📍 Status Atual do Projeto (Mar/2026)
 
-- **Fase atual:** **Fase 5 (em andamento)**
-- **Próxima fase:** fechar pendências de UX/operação e iniciar Fase 6 (deploy)
+- **Fase atual:** **Fase 6 (deploy)**
+- **Fase anterior:** **Fase 5 concluída**
 - Entrada principal atual em `http://localhost:3000` com seleção por perfil
 
 ---
@@ -93,7 +93,7 @@ Também há modal para visualização de detalhes e busca de produtos.
 
 Status desta fase: concluída.
 
-### Fase 5: Melhorias (Estimado: 2-3 horas)
+### Fase 5: Melhorias (Estimado: 2-3 horas) ✅
 - [x] WebSockets (tempo real)
 - [x] Autenticação/Login
 - [x] Relatórios de vendas
@@ -137,13 +137,29 @@ Preparativos já iniciados para Fase 5:
 - [x] Endpoints de usuários: `GET/POST /api/auth/usuarios`, `PUT/DELETE /api/auth/usuarios/:id`
 
 ### Fase 6: Deploy (Estimado: 2-3 horas)
-- [ ] correção de bugs e melhorias pós-deploy (incluindo mas não limitado a refatorar todas as telas do app e limpar codigos comentados e não utilizados)
 - [x] criar instalador bootstrap para máquina nova (instala Git + Node.js LTS + clone GitHub + setup) (`INSTALAR_PDV_GITHUB.bat`)
-- [ ] documentação de instalação e uso para usuários finais (ex.: equipe do bar)
-- [ ] apagar o banco de dados de teste
-- [ ] consolidar a interface para ter o mesmo padrão entre telas e dispositivos (potencialmente seguindo o padrão estabelecido no painel.html)
-- [ ] tela do gerente (relatórios, histórico, gestão de usuários)
-- [ ] tela do dev (full access para testes e debug de todas as funcionalidades)
+- [x] documentação de instalação e uso para usuários finais (ex.: equipe do bar)
+- [x] apagar o banco de dados de teste (com backup automático antes da remoção via menu Dev)
+- [x] tela do gerente (relatórios, histórico, gestão de usuários)
+- [x] tela do dev (full access para testes e debug de todas as funcionalidades)
+- [x] centralizar manutenção no menu Dev (reset do banco do tenant atual, auto-start do Windows e status de manutenção)
+- [x] opção de instalar o pdv como webapp (PWA) para acesso direto do desktop/área de trabalho sem precisar abrir o navegador manualmente
+- [x] opção de rodar o servidor como serviço do Windows para iniciar automaticamente com o sistema e rodar em segundo plano sem necessidade de abrir o PowerShell (via menu Dev)
+- [x] opção de gerenciar estoque para variantes (ex.: chopp 300ml/500ml/1L) com controle de estoque separado por variação
+- [x] visual do PIX no fechamento da comanda com QR grande e código copia e cola na própria tela de fechamento
+- [x] organizar a tela de estoque por categorias (ex.: bebidas, comidas, sobremesas) para facilitar a navegação e gestão dos produtos
+- [x] gerenciar categorias de produtos (CRUD de categorias + associação de produtos a categorias) para organizar o cardápio e facilitar a navegação no painel/garçom
+- [x] opção de atribuir cliente a uma venda/comanda para registro e análise de histórico de compras por cliente (na criação/edição da venda, selecionar cliente existente ou criar novo cliente)
+- [x] opção de criar vários restaurantes/lojas (criar e listar tenants no menu Dev)
+- [x] backup manual acessível pelo menu Dev
+- [x] melhorar o keypad de preço para permitir edição rápida de preço e quantidade (ex.: suporte a backspace, clear, etc) tambem posibilitando usar o teclado físico para agilizar a operação
+- [x] opção para limpar os avisos
+- [x] opção de criar varios restaurastes/lojas
+- [x] implementar testes automatizados (unitários e de integração) para garantir a estabilidade do sistema
+- [x] criar db separadas para teste e para cada tenant (multi-restaurante) para isolar os dados e facilitar a manutenção
+- [x] melhorar a o sistema de login/autenticação (ex.: JWT, sessões, recuperação de senha) para segurança e gestão de usuários
+- [ ] correção de bugs e melhorias pós-deploy (incluindo mas não limitado a refatorar todas as telas do app e limpar codigos comentados e não utilizados)
+- [x] refatorar as telas para seguir o padrão material ui (ou outro design system) para melhorar a consistência visual e usabilidade do aplicativo
 
 ---
 

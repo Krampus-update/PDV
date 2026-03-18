@@ -78,6 +78,13 @@
 
           <section class="cfg-popup-pane" data-pane="impressao">
             <div class="cfg-card" style="margin-bottom:12px">
+              <div class="form-group">
+                <label for="impDestino">Destino da impressora</label>
+                <select id="impDestino">
+                  <option value="balcao">Balcão / Fechamento</option>
+                  <option value="cozinha">Cozinha</option>
+                </select>
+              </div>
               <label style="font-size:12px;display:flex;align-items:center;gap:6px;margin-bottom:8px">
                 <input id="impHabilitada" type="checkbox"> Habilitar impressão
               </label>
@@ -141,6 +148,11 @@
                 <div class="form-group">
                   <label for="pixDescricaoPadrao">Descrição padrão</label>
                   <input id="pixDescricaoPadrao" type="text" placeholder="Pagamento PDV">
+                </div>
+                <div class="form-group">
+                  <label for="pixQrArquivo">QR code do Pix (upload)</label>
+                  <input id="pixQrArquivo" type="file" accept="image/*">
+                  <img id="pixQrPreview" alt="Prévia do QR Pix" style="display:none;margin-top:8px;max-width:180px;border:1px solid #dbe3ef;border-radius:14px;padding:6px;background:#fff">
                 </div>
                 <div class="cfg-actions">
                   <button id="btnSalvarPix" class="btn btn-primary" type="button">Salvar PIX</button>
@@ -263,6 +275,7 @@
     const btnSalvarCfg = modal.querySelector('#btnSalvarCfg');
 
     const impHabilitada = modal.querySelector('#impHabilitada');
+    const impDestino = modal.querySelector('#impDestino');
     const impTipo = modal.querySelector('#impTipo');
     const impNome = modal.querySelector('#impNome');
     const impHost = modal.querySelector('#impHost');
@@ -282,6 +295,8 @@
     const pixNomeRecebedor = modal.querySelector('#pixNomeRecebedor');
     const pixCidade = modal.querySelector('#pixCidade');
     const pixDescricaoPadrao = modal.querySelector('#pixDescricaoPadrao');
+    const pixQrArquivo = modal.querySelector('#pixQrArquivo');
+    const pixQrPreview = modal.querySelector('#pixQrPreview');
     const btnSalvarPix = modal.querySelector('#btnSalvarPix');
     const pixStatus = modal.querySelector('#pixStatus');
     const pagAtivo = modal.querySelector('#pagAtivo');
@@ -302,6 +317,8 @@
     const filtroUsuario = modal.querySelector('#filtroUsuario');
 
     let usersCache = [];
+    let printerCache = { balcao: null, cozinha: null };
+    let pixQrAtual = '';
 
     function setImpStatus(msg, isError) {
       impStatus.textContent = msg || '';
@@ -314,6 +331,27 @@
     function setPagStatus(msg, isError) {
       pagStatus.textContent = msg || '';
       pagStatus.style.color = isError ? '#b91c1c' : '#64748b';
+    }
+
+    function setPixPreview(src) {
+      pixQrAtual = src || '';
+      if (!pixQrPreview) return;
+      if (pixQrAtual) {
+        pixQrPreview.src = pixQrAtual;
+        pixQrPreview.style.display = 'block';
+      } else {
+        pixQrPreview.removeAttribute('src');
+        pixQrPreview.style.display = 'none';
+      }
+    }
+
+    function readFileAsDataUrl(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ''));
+        reader.onerror = () => reject(new Error('Falha ao ler arquivo'));
+        reader.readAsDataURL(file);
+      });
     }
 
     async function loadVersions() {
@@ -343,6 +381,19 @@
       impLocalGroup.style.display = isLocalMode ? '' : 'none';
     }
 
+    function fillPrinterForm(cfg) {
+      if (!cfg) return;
+      impHabilitada.checked = !!cfg.habilitada;
+      impTipo.value = cfg.tipo || 'rede';
+      impNome.value = cfg.nome || '';
+      impHost.value = cfg.host || '';
+      impPorta.value = cfg.porta || 9100;
+      impLocal.value = cfg.impressora_local || '';
+      impAutoFechamento.checked = !!cfg.auto_fechamento;
+      impAutoCozinhaItem.checked = !!cfg.auto_cozinha_item;
+      atualizarCamposImpressora();
+    }
+
     function loadCfg() {
       const cfg = JSON.parse(localStorage.getItem('pdv_config') || '{}');
       cfgNome.value = cfg.nome || '';
@@ -363,18 +414,11 @@
       uiNotify('Configurações salvas.', 'success');
     }
 
-    async function loadPrinterCfg() {
+    async function loadPrinterCfg(destino = impDestino?.value || 'balcao') {
       try {
-        const cfg = await API.obterConfigImpressao();
-        impHabilitada.checked = !!cfg.habilitada;
-        impTipo.value = cfg.tipo || 'rede';
-        impNome.value = cfg.nome || '';
-        impHost.value = cfg.host || '';
-        impPorta.value = cfg.porta || 9100;
-        impLocal.value = cfg.impressora_local || '';
-        impAutoFechamento.checked = !!cfg.auto_fechamento;
-        impAutoCozinhaItem.checked = !!cfg.auto_cozinha_item;
-        atualizarCamposImpressora();
+        const cfg = await API.obterConfigImpressao(destino);
+        printerCache[destino] = cfg;
+        fillPrinterForm(cfg);
       } catch (e) {
         setImpStatus(e.message || 'Erro ao carregar impressora', true);
       }
@@ -392,8 +436,10 @@
           auto_fechamento: !!impAutoFechamento.checked,
           auto_cozinha_item: !!impAutoCozinhaItem.checked
         };
-        await API.salvarConfigImpressao(payload);
-        setImpStatus('Configuração salva com sucesso.', false);
+        const destino = impDestino?.value || 'balcao';
+        await API.salvarConfigImpressao(payload, destino);
+        printerCache[destino] = { ...payload, destino };
+        setImpStatus(`Configuração de ${destino} salva com sucesso.`, false);
       } catch (e) {
         setImpStatus(e.message || 'Erro ao salvar impressora', true);
       }
@@ -412,7 +458,7 @@
 
     async function testarImpressora() {
       try {
-        await API.testarImpressora();
+        await API.testarImpressora(impDestino?.value || 'balcao');
         setImpStatus('Teste enviado para a impressora.', false);
       } catch (e) {
         setImpStatus(e.message || 'Erro no teste da impressora', true);
@@ -427,6 +473,8 @@
         pixNomeRecebedor.value = cfg.nome_recebedor || '';
         pixCidade.value = cfg.cidade || '';
         pixDescricaoPadrao.value = cfg.descricao_padrao || '';
+        setPixPreview(cfg.qr_imagem || '');
+        setPixStatus('Configuração Pix carregada.', false);
       } catch (e) {
         setPixStatus(e.message || 'Erro ao carregar PIX', true);
       }
@@ -439,9 +487,10 @@
           chave: pixChave.value.trim(),
           nome_recebedor: pixNomeRecebedor.value.trim(),
           cidade: pixCidade.value.trim(),
-          descricao_padrao: pixDescricaoPadrao.value.trim()
+          descricao_padrao: pixDescricaoPadrao.value.trim(),
+          qr_imagem: pixQrAtual || ''
         });
-        setPixStatus('Configuração PIX salva com sucesso.', false);
+        setPixStatus('Configuração Pix salva.', false);
       } catch (e) {
         setPixStatus(e.message || 'Erro ao salvar PIX', true);
       }
@@ -614,10 +663,28 @@
     }
 
     btnSalvarCfg.addEventListener('click', saveCfg);
+    impDestino?.addEventListener('change', async () => {
+      const destino = impDestino.value || 'balcao';
+      if (printerCache[destino]) {
+        fillPrinterForm(printerCache[destino]);
+        return;
+      }
+      await loadPrinterCfg(destino);
+    });
     impTipo.addEventListener('change', atualizarCamposImpressora);
     btnSalvarImpressora.addEventListener('click', salvarPrinterCfg);
     btnListarImpressoras.addEventListener('click', listarImpressorasLocais);
     btnTesteImpressora.addEventListener('click', testarImpressora);
+    pixQrArquivo?.addEventListener('change', async () => {
+      const file = pixQrArquivo.files?.[0];
+      if (!file) return;
+      try {
+        setPixPreview(await readFileAsDataUrl(file));
+        setPixStatus('Imagem do QR carregada. Clique em salvar.', false);
+      } catch (e) {
+        setPixStatus(e.message || 'Falha ao carregar QR', true);
+      }
+    });
     btnSalvarPix.addEventListener('click', salvarPixCfg);
     btnSalvarPagamento.addEventListener('click', salvarPagCfg);
     filtroUsuario.addEventListener('input', renderUsers);
@@ -627,7 +694,7 @@
       loadAll: async () => {
         loadCfg();
         atualizarCamposImpressora();
-        await Promise.all([loadPrinterCfg(), loadPixCfg(), loadPagCfg(), listarUsuarios(), loadVersions()]);
+        await Promise.all([loadPrinterCfg('cozinha'), loadPrinterCfg('balcao'), loadPixCfg(), loadPagCfg(), listarUsuarios(), loadVersions()]);
       }
     };
   }

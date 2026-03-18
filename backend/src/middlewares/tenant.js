@@ -2,6 +2,10 @@ import { sanitizeTenantCode, tenantExists, initializeTenantDatabase, runWithTena
 
 const PUBLIC_WITHOUT_TENANT = new Set(['/', '/status']);
 
+function isPublicDevPath(pathname) {
+  return pathname === '/dev' || pathname.startsWith('/dev/');
+}
+
 function isAuthPath(pathname, target) {
   return pathname === `/auth/${target}`;
 }
@@ -9,7 +13,7 @@ function isAuthPath(pathname, target) {
 async function tenantMiddleware(req, res, next) {
   try {
     const pathname = req.path || '';
-    if (PUBLIC_WITHOUT_TENANT.has(pathname)) {
+    if (PUBLIC_WITHOUT_TENANT.has(pathname) || isPublicDevPath(pathname)) {
       return next();
     }
 

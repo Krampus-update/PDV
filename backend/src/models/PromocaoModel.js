@@ -19,13 +19,14 @@ class PromocaoModel {
   static async criar(dados) {
     const result = await dbRun(
       `INSERT INTO promocoes
-       (nome, descricao, tipo, produto_id, quantidade_min, repetir_na_venda, preco_combo, desconto_percentual, desconto_fixo, data_inicio, data_fim, ativo)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (nome, descricao, tipo, produto_id, categoria, quantidade_min, repetir_na_venda, preco_combo, desconto_percentual, desconto_fixo, data_inicio, data_fim, ativo)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         dados.nome,
         dados.descricao || null,
         dados.tipo || 'combo_produto',
         dados.produto_id || null,
+        dados.categoria || null,
         Number(dados.quantidade_min || 0),
         dados.repetir_na_venda === false ? 0 : 1,
         dados.preco_combo === null || dados.preco_combo === undefined ? null : Number(dados.preco_combo),
@@ -49,6 +50,7 @@ class PromocaoModel {
           'descricao',
           'tipo',
           'produto_id',
+          'categoria',
           'quantidade_min',
           'repetir_na_venda',
           'preco_combo',

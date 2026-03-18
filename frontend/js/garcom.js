@@ -107,7 +107,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const arr = JSON.parse(prod?.opcoes_json || '[]');
       if (!Array.isArray(arr)) return [];
       return arr
-        .map((o) => ({ nome: String(o?.nome || '').trim(), extra: Number(o?.extra || 0) || 0 }))
+        .map((o) => ({
+          nome: String(o?.nome || '').trim(),
+          extra: Number(o?.extra || 0) || 0,
+          estoque: o?.estoque === '' || o?.estoque === null || o?.estoque === undefined ? null : Math.max(0, Number.parseInt(o?.estoque, 10) || 0)
+        }))
         .filter((o) => o.nome);
     } catch {
       return [];
@@ -122,15 +126,34 @@ document.addEventListener('DOMContentLoaded', () => {
           title: `Variação - ${prod.nome}`,
           message: 'Selecione a variação desejada.',
           okLabel: 'Adicionar',
-          items: opcoes.map((o, index) => ({
-            value: index,
-            label: o.nome,
-            meta: `${o.extra >= 0 ? '+' : ''}${formatarMoeda(o.extra)}`
-          }))
+          items: [
+            {
+              value: -1,
+              label: 'Normal',
+              meta: `${formatarMoeda(Number(prod.preco || 0))} • estoque padrão`
+            },
+            ...opcoes.map((o, index) => ({
+              value: index,
+              label: o.nome,
+              meta: [
+                `${o.extra >= 0 ? '+' : ''}${formatarMoeda(o.extra)}`,
+                o.estoque === null ? 'estoque livre' : `${o.estoque} disp.`
+              ].join(' • '),
+              disabled: o.estoque !== null && Number(o.estoque) <= 0
+            }))
+          ]
         })
       : 0;
-    if (idx === null || idx === undefined || !opcoes[idx]) return null;
+    if (idx === null || idx === undefined) return null;
+    if (Number(idx) === -1) {
+      return { observacoes: null, preco: Number(prod.preco || 0) };
+    }
     const sel = opcoes[idx];
+    if (!sel) return null;
+    if (sel.estoque !== null && Number(sel.estoque) <= 0) {
+      await uiAlert(`A variação "${sel.nome}" está sem estoque.`, 'warning');
+      return null;
+    }
     return {
       observacoes: sel.nome,
       preco: Number(prod.preco || 0) + Number(sel.extra || 0)

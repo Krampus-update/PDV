@@ -18,6 +18,13 @@ const DEFAULTS = {
   corte: true
 };
 
+const LEGACY_PREFIX = 'impressora_';
+const PRINTER_DESTINOS = new Set(['balcao', 'cozinha']);
+
+function normalizeDestino(value) {
+  return String(value || 'balcao').toLowerCase().trim() === 'cozinha' ? 'cozinha' : 'balcao';
+}
+
 function toBool(value, fallback = false) {
   if (value === null || value === undefined || value === '') return fallback;
   if (typeof value === 'boolean') return value;
@@ -48,44 +55,73 @@ function normalizeConfig(raw = {}) {
   return cfg;
 }
 
-async function obterConfiguracao() {
-  const map = await ConfiguracaoModel.obterPorPrefixo('impressora_');
+function getSectionValue(map, sectionPrefix, key, fallback = undefined) {
+  const sectionKey = `${sectionPrefix}${key}`;
+  if (Object.prototype.hasOwnProperty.call(map, sectionKey)) return map[sectionKey];
+  const legacyKey = `${LEGACY_PREFIX}${key}`;
+  if (Object.prototype.hasOwnProperty.call(map, legacyKey)) return map[legacyKey];
+  return fallback;
+}
+
+async function obterConfiguracao(tipo = 'balcao') {
+  const destino = normalizeDestino(tipo);
+  const map = await ConfiguracaoModel.obterPorPrefixo(LEGACY_PREFIX);
+  const sectionPrefix = `${LEGACY_PREFIX}${destino}_`;
   return normalizeConfig({
-    habilitada: map.impressora_habilitada,
-    tipo: map.impressora_tipo,
-    host: map.impressora_host,
-    porta: map.impressora_porta,
-    impressora_local: map.impressora_local,
-    auto_fechamento: map.impressora_auto_fechamento,
-    auto_cozinha_item: map.impressora_auto_cozinha_item,
-    nome: map.impressora_nome,
-    largura: map.impressora_largura,
-    corte: map.impressora_corte
+    habilitada: getSectionValue(map, sectionPrefix, 'habilitada'),
+    tipo: getSectionValue(map, sectionPrefix, 'tipo'),
+    host: getSectionValue(map, sectionPrefix, 'host'),
+    porta: getSectionValue(map, sectionPrefix, 'porta'),
+    impressora_local: getSectionValue(map, sectionPrefix, 'local'),
+    auto_fechamento: getSectionValue(map, sectionPrefix, 'auto_fechamento'),
+    auto_cozinha_item: getSectionValue(map, sectionPrefix, 'auto_cozinha_item'),
+    nome: getSectionValue(map, sectionPrefix, 'nome'),
+    largura: getSectionValue(map, sectionPrefix, 'largura'),
+    corte: getSectionValue(map, sectionPrefix, 'corte')
   });
 }
 
 async function salvarConfiguracao(parcial = {}) {
-  const atual = await obterConfiguracao();
+  const destino = normalizeDestino(parcial.destino || parcial.tipo_destino || parcial.section || 'balcao');
+  const atual = await obterConfiguracao(destino);
   const proxima = normalizeConfig({ ...atual, ...parcial });
 
   if (proxima.habilitada && proxima.tipo === 'rede' && !proxima.host) {
     throw new Error('Host da impressora é obrigatório no modo rede');
   }
 
-  await Promise.all([
-    ConfiguracaoModel.definir('impressora_habilitada', proxima.habilitada ? '1' : '0'),
-    ConfiguracaoModel.definir('impressora_tipo', proxima.tipo),
-    ConfiguracaoModel.definir('impressora_host', proxima.host || ''),
-    ConfiguracaoModel.definir('impressora_porta', String(proxima.porta)),
-    ConfiguracaoModel.definir('impressora_local', proxima.impressora_local || ''),
-    ConfiguracaoModel.definir('impressora_auto_fechamento', proxima.auto_fechamento ? '1' : '0'),
-    ConfiguracaoModel.definir('impressora_auto_cozinha_item', proxima.auto_cozinha_item ? '1' : '0'),
-    ConfiguracaoModel.definir('impressora_nome', proxima.nome || DEFAULTS.nome),
-    ConfiguracaoModel.definir('impressora_largura', String(proxima.largura)),
-    ConfiguracaoModel.definir('impressora_corte', proxima.corte ? '1' : '0')
-  ]);
+  const prefix = `${LEGACY_PREFIX}${destino}_`;
+  const writes = [
+    ConfiguracaoModel.definir(`${prefix}habilitada`, proxima.habilitada ? '1' : '0'),
+    ConfiguracaoModel.definir(`${prefix}tipo`, proxima.tipo),
+    ConfiguracaoModel.definir(`${prefix}host`, proxima.host || ''),
+    ConfiguracaoModel.definir(`${prefix}porta`, String(proxima.porta)),
+    ConfiguracaoModel.definir(`${prefix}local`, proxima.impressora_local || ''),
+    ConfiguracaoModel.definir(`${prefix}auto_fechamento`, proxima.auto_fechamento ? '1' : '0'),
+    ConfiguracaoModel.definir(`${prefix}auto_cozinha_item`, proxima.auto_cozinha_item ? '1' : '0'),
+    ConfiguracaoModel.definir(`${prefix}nome`, proxima.nome || DEFAULTS.nome),
+    ConfiguracaoModel.definir(`${prefix}largura`, String(proxima.largura)),
+    ConfiguracaoModel.definir(`${prefix}corte`, proxima.corte ? '1' : '0')
+  ];
 
-  return proxima;
+  if (destino === 'balcao') {
+    writes.push(
+      ConfiguracaoModel.definir('impressora_habilitada', proxima.habilitada ? '1' : '0'),
+      ConfiguracaoModel.definir('impressora_tipo', proxima.tipo),
+      ConfiguracaoModel.definir('impressora_host', proxima.host || ''),
+      ConfiguracaoModel.definir('impressora_porta', String(proxima.porta)),
+      ConfiguracaoModel.definir('impressora_local', proxima.impressora_local || ''),
+      ConfiguracaoModel.definir('impressora_auto_fechamento', proxima.auto_fechamento ? '1' : '0'),
+      ConfiguracaoModel.definir('impressora_auto_cozinha_item', proxima.auto_cozinha_item ? '1' : '0'),
+      ConfiguracaoModel.definir('impressora_nome', proxima.nome || DEFAULTS.nome),
+      ConfiguracaoModel.definir('impressora_largura', String(proxima.largura)),
+      ConfiguracaoModel.definir('impressora_corte', proxima.corte ? '1' : '0')
+    );
+  }
+
+  await Promise.all(writes);
+
+  return { ...proxima, destino };
 }
 
 function padRight(text, width) {
@@ -247,8 +283,8 @@ async function imprimirLocalWindows(texto, cfg) {
   }
 }
 
-async function imprimirTexto(texto) {
-  const cfg = await obterConfiguracao();
+async function imprimirTexto(texto, destino = 'balcao') {
+  const cfg = await obterConfiguracao(destino);
   if (!cfg.habilitada) throw new Error('Impressão térmica está desabilitada');
   if (cfg.tipo === 'local') {
     await imprimirLocalWindows(texto, cfg);
@@ -260,8 +296,8 @@ async function imprimirTexto(texto) {
   return cfg;
 }
 
-async function imprimirTeste() {
-  const cfg = await obterConfiguracao();
+async function imprimirTeste(destino = 'balcao') {
+  const cfg = await obterConfiguracao(destino);
   const texto = [
     cfg.nome.toUpperCase(),
     line(cfg.largura, '='),
@@ -274,14 +310,15 @@ async function imprimirTeste() {
     ' ',
     ' '
   ].join('\n');
-  await imprimirTexto(texto);
+  await imprimirTexto(texto, destino);
   return cfg;
 }
 
 async function imprimirVenda(venda, itens, tipo = 'balcao') {
-  const cfg = await obterConfiguracao();
+  const destino = normalizeDestino(tipo);
+  const cfg = await obterConfiguracao(destino);
   const texto = buildVendaTicket(venda, itens, cfg, tipo);
-  await imprimirTexto(texto);
+  await imprimirTexto(texto, destino);
   return cfg;
 }
 
