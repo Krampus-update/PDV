@@ -1,4 +1,4 @@
-import { DEV_LOGIN, getDevPassword } from '../services/devAccessService.js';
+import { DEV_LOGIN, verifyDevPassword } from '../services/devAccessService.js';
 import UsuarioModel from '../models/UsuarioModel.js';
 import HistoricoModel from '../models/HistoricoModel.js';
 import {
@@ -98,15 +98,15 @@ class AuthController {
 
       const resultado = await runWithTenant(tenantCode, async () => {
         if (login === DEV_LOGIN) {
-          const devPassword = await getDevPassword();
-          if (senha !== devPassword) return null;
+          const devPasswordOk = await verifyDevPassword(senha);
+          if (!devPasswordOk) return null;
 
           let devUser = await UsuarioModel.obterPorLoginQualquerStatus(DEV_LOGIN);
           if (!devUser) {
             const devId = await UsuarioModel.criarUsuario({
               nome: 'Desenvolvedor',
               login: DEV_LOGIN,
-              senha: devPassword,
+              senha,
               role: 'dev'
             });
             devUser = await UsuarioModel.obterPorLoginQualquerStatus(DEV_LOGIN);
@@ -114,7 +114,7 @@ class AuthController {
               devUser = { id: devId, nome: 'Desenvolvedor', login: DEV_LOGIN, role: 'dev', ativo: 1 };
             }
           } else if (normalizeRole(devUser.role) !== 'dev' || Number(devUser.ativo || 0) !== 1) {
-            await UsuarioModel.atualizarUsuario(devUser.id, { role: 'dev', ativo: true, senha: devPassword });
+            await UsuarioModel.atualizarUsuario(devUser.id, { role: 'dev', ativo: true, senha });
             devUser = await UsuarioModel.obterPorLoginQualquerStatus(DEV_LOGIN);
           }
 

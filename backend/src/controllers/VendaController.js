@@ -501,6 +501,10 @@ class VendaController {
         return res.status(404).json({ error: 'Produto não encontrado' });
       }
       const opcaoSelecionada = acharOpcaoProduto(produto, observacoes);
+      const qtd = parseInt(quantidade, 10);
+      if (!qtd || qtd < 1) {
+        return res.status(400).json({ error: 'Quantidade inválida' });
+      }
 
       // verifica se produto é temporário/avulso (não controla estoque)
       const avulso = isAvulso(produto);
@@ -512,17 +516,12 @@ class VendaController {
         if (produto.estoque <= 0) {
           return res.status(400).json({ error: 'Produto sem estoque' });
         }
-        if (produto.estoque < quantidade) {
+        if (produto.estoque < qtd) {
           return res.status(400).json({ error: 'Estoque insuficiente' });
         }
         if (opcaoSelecionada && opcaoSelecionada.estoque !== null && Number(opcaoSelecionada.estoque) < qtd) {
           return res.status(400).json({ error: `Variação "${opcaoSelecionada.nome}" sem estoque suficiente` });
         }
-      }
-
-      const qtd = parseInt(quantidade, 10);
-      if (!qtd || qtd < 1) {
-        return res.status(400).json({ error: 'Quantidade inválida' });
       }
 
       const obsNorm = String(observacoes || '').trim() || null;

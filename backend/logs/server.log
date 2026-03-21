@@ -116,3 +116,20 @@ Deseja finalizar o arquivo em lotes (S/N)?
 
 ✓ Auto-backup executado (2026-03-11T10:54:14.474Z)
 ✓ Auto-backup executado (2026-03-11T16:54:14.438Z)
+
+> pdv-system-backend@1.0.0 start
+> node scripts/start-server.js
+
+[AVISO] Node atual v25.7.0 nao e compativel com sqlite3. Iniciando com Node LTS em: C:\Users\Pedro\AppData\Local\Microsoft\WinGet\Packages\OpenJS.NodeJS.LTS_Microsoft.Winget.Source_8wekyb3d8bbwe\node-v24.14.0-win-x64\node.exe
+✓ Banco de dados inicializado com sucesso
+✓ WebSocket realtime ativo em /ws
+
+===================================
+🚀 PDV System - Backend iniciado
+===================================
+📡 Servidor rodando em http://localhost:3000
+🌐 Acessível via rede: http://<seu-ip>:3000
+📊 API de status: http://localhost:3000/api/status
+⚡ Realtime WS: ws://localhost:3000/ws
+===================================
+

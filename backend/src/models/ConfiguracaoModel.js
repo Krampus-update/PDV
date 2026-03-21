@@ -22,6 +22,10 @@ class ConfiguracaoModel {
       return acc;
     }, {});
   }
+
+  static async remover(chave) {
+    await dbRun('DELETE FROM configuracoes WHERE chave = ?', [String(chave)]);
+  }
 }
 
 export default ConfiguracaoModel;

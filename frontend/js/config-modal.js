@@ -80,10 +80,11 @@
             <div class="cfg-card" style="margin-bottom:12px">
               <div class="form-group">
                 <label for="impDestino">Destino da impressora</label>
-                <select id="impDestino">
-                  <option value="balcao">Balcão / Fechamento</option>
-                  <option value="cozinha">Cozinha</option>
-                </select>
+                <select id="impDestino"></select>
+                <div style="display:grid;grid-template-columns:1fr 110px;gap:8px;margin-top:8px">
+                  <input id="impNovoDestino" type="text" placeholder="Novo destino (ex.: caixa, bar, delivery)">
+                  <button id="btnNovoDestino" class="btn btn-secondary" type="button">Criar</button>
+                </div>
               </div>
               <label style="font-size:12px;display:flex;align-items:center;gap:6px;margin-bottom:8px">
                 <input id="impHabilitada" type="checkbox"> Habilitar impressão
@@ -124,6 +125,7 @@
                 <button id="btnSalvarImpressora" class="btn btn-primary" type="button">Salvar impressora</button>
                 <button id="btnListarImpressoras" class="btn btn-secondary" type="button">Listar locais</button>
                 <button id="btnTesteImpressora" class="btn btn-secondary" type="button">Imprimir teste</button>
+                <button id="btnExcluirDestino" class="btn btn-danger" type="button">Excluir destino</button>
               </div>
               <small id="impStatus" style="display:block;margin-top:8px;color:#64748b"></small>
             </div>
@@ -276,6 +278,7 @@
 
     const impHabilitada = modal.querySelector('#impHabilitada');
     const impDestino = modal.querySelector('#impDestino');
+    const impNovoDestino = modal.querySelector('#impNovoDestino');
     const impTipo = modal.querySelector('#impTipo');
     const impNome = modal.querySelector('#impNome');
     const impHost = modal.querySelector('#impHost');
@@ -289,6 +292,8 @@
     const btnSalvarImpressora = modal.querySelector('#btnSalvarImpressora');
     const btnListarImpressoras = modal.querySelector('#btnListarImpressoras');
     const btnTesteImpressora = modal.querySelector('#btnTesteImpressora');
+    const btnNovoDestino = modal.querySelector('#btnNovoDestino');
+    const btnExcluirDestino = modal.querySelector('#btnExcluirDestino');
     const impStatus = modal.querySelector('#impStatus');
     const pixHabilitado = modal.querySelector('#pixHabilitado');
     const pixChave = modal.querySelector('#pixChave');
@@ -317,7 +322,7 @@
     const filtroUsuario = modal.querySelector('#filtroUsuario');
 
     let usersCache = [];
-    let printerCache = { balcao: null, cozinha: null };
+    let printerCache = {};
     let pixQrAtual = '';
 
     function setImpStatus(msg, isError) {
@@ -383,15 +388,81 @@
 
     function fillPrinterForm(cfg) {
       if (!cfg) return;
+      const destinoAtual = normalizeDestinoValue(impDestino?.value || 'balcao');
       impHabilitada.checked = !!cfg.habilitada;
       impTipo.value = cfg.tipo || 'rede';
-      impNome.value = cfg.nome || '';
+      const nomePadrao = destinoAtual === 'balcao'
+        ? 'Balcão / Fechamento'
+        : destinoAtual === 'cozinha'
+          ? 'Cozinha'
+          : destinoAtual.replace(/_/g, ' ');
+      impNome.value = cfg.nome || nomePadrao;
       impHost.value = cfg.host || '';
       impPorta.value = cfg.porta || 9100;
       impLocal.value = cfg.impressora_local || '';
       impAutoFechamento.checked = !!cfg.auto_fechamento;
       impAutoCozinhaItem.checked = !!cfg.auto_cozinha_item;
       atualizarCamposImpressora();
+    }
+
+    function normalizeDestinoValue(value) {
+      return String(value || '')
+        .toLowerCase()
+        .trim()
+        .replace(/\s+/g, '_')
+        .replace(/[^a-z0-9_-]/g, '')
+        .replace(/_+/g, '_')
+        .replace(/^-+|-+$/g, '');
+    }
+
+    function renderPrinterDestinations(configs = []) {
+      const current = String(impDestino?.value || '').trim();
+      const ordered = [...configs];
+      if (!ordered.some((c) => c.destino === 'balcao')) ordered.unshift({ destino: 'balcao', nome: 'Balcão / Fechamento' });
+      if (!ordered.some((c) => c.destino === 'cozinha')) ordered.push({ destino: 'Cozinha' });
+      const uniq = [];
+      const seen = new Set();
+      for (const cfg of ordered) {
+        const destino = normalizeDestinoValue(cfg.destino);
+        if (!destino || seen.has(destino)) continue;
+        seen.add(destino);
+        const nomeBase = destino === 'balcao'
+          ? 'Balcão / Fechamento'
+          : destino === 'cozinha'
+            ? 'Cozinha'
+            : String(cfg.nome || '').trim() || destino.replace(/_/g, ' ');
+        uniq.push({ ...cfg, destino, label: destino === 'balcao' || destino === 'cozinha' ? nomeBase : `${nomeBase} (${destino})` });
+      }
+      impDestino.innerHTML = uniq
+        .map((cfg) => `<option value="${String(cfg.destino).replace(/"/g, '&quot;')}">${String(cfg.label || cfg.destino).replace(/"/g, '&quot;')}</option>`)
+        .join('');
+      if (current && seen.has(current)) {
+        impDestino.value = current;
+      } else {
+        impDestino.value = uniq[0]?.destino || 'balcao';
+      }
+    }
+
+    async function carregarListaImpressoras(destinoPreferido = null) {
+      try {
+        const data = await API.listarConfigsImpressao();
+        const configs = Array.isArray(data.configs) ? data.configs : [];
+        printerCache = configs.reduce((acc, cfg) => {
+          acc[cfg.destino] = cfg;
+          return acc;
+        }, {});
+        renderPrinterDestinations(configs);
+        const destino = normalizeDestinoValue(destinoPreferido || impDestino?.value || 'balcao');
+        if (printerCache[destino]) {
+          fillPrinterForm(printerCache[destino]);
+        } else {
+          await loadPrinterCfg(destino);
+        }
+        return configs;
+      } catch (e) {
+        setImpStatus(e.message || 'Erro ao carregar destinos de impressora', true);
+        return [];
+      }
     }
 
     function loadCfg() {
@@ -416,8 +487,10 @@
 
     async function loadPrinterCfg(destino = impDestino?.value || 'balcao') {
       try {
-        const cfg = await API.obterConfigImpressao(destino);
-        printerCache[destino] = cfg;
+        const destinoSlug = normalizeDestinoValue(destino);
+        impDestino.value = destinoSlug;
+        const cfg = await API.obterConfigImpressao(destinoSlug);
+        printerCache[destinoSlug] = cfg;
         fillPrinterForm(cfg);
       } catch (e) {
         setImpStatus(e.message || 'Erro ao carregar impressora', true);
@@ -426,6 +499,7 @@
 
     async function salvarPrinterCfg() {
       try {
+        const destino = normalizeDestinoValue(impDestino?.value || 'balcao');
         const payload = {
           habilitada: impHabilitada.checked,
           tipo: impTipo.value,
@@ -436,9 +510,9 @@
           auto_fechamento: !!impAutoFechamento.checked,
           auto_cozinha_item: !!impAutoCozinhaItem.checked
         };
-        const destino = impDestino?.value || 'balcao';
         await API.salvarConfigImpressao(payload, destino);
         printerCache[destino] = { ...payload, destino };
+        await carregarListaImpressoras(destino);
         setImpStatus(`Configuração de ${destino} salva com sucesso.`, false);
       } catch (e) {
         setImpStatus(e.message || 'Erro ao salvar impressora', true);
@@ -458,10 +532,53 @@
 
     async function testarImpressora() {
       try {
-        await API.testarImpressora(impDestino?.value || 'balcao');
+        await API.testarImpressora(normalizeDestinoValue(impDestino?.value || 'balcao'));
         setImpStatus('Teste enviado para a impressora.', false);
       } catch (e) {
         setImpStatus(e.message || 'Erro no teste da impressora', true);
+      }
+    }
+
+    async function criarNovoDestino() {
+      const destino = normalizeDestinoValue(impNovoDestino?.value || '');
+      if (!destino) {
+        return uiAlert('Digite um nome para o novo destino.', 'warning');
+      }
+      impDestino.value = destino;
+      impNovoDestino.value = '';
+      if (printerCache[destino]) {
+        fillPrinterForm(printerCache[destino]);
+      } else {
+        fillPrinterForm({
+          habilitada: false,
+          tipo: 'rede',
+          host: '',
+          porta: 9100,
+          impressora_local: '',
+          auto_fechamento: false,
+          auto_cozinha_item: false,
+          nome: destino,
+          largura: 42,
+          corte: true
+        });
+      }
+      setImpStatus(`Destino "${destino}" pronto para salvar.`, false);
+    }
+
+    async function excluirDestinoAtual() {
+      const destino = normalizeDestinoValue(impDestino?.value || 'balcao');
+      if (!destino || destino === 'balcao' || destino === 'cozinha') {
+        return uiAlert('Os destinos padrão balcao e cozinha não podem ser removidos.', 'warning');
+      }
+      const ok = await uiConfirm(`Excluir o destino "${destino}"?`, { title: 'Impressão' });
+      if (!ok) return;
+      try {
+        await API.removerConfigImpressao(destino);
+        delete printerCache[destino];
+        await carregarListaImpressoras('balcao');
+        setImpStatus(`Destino "${destino}" removido.`, false);
+      } catch (e) {
+        setImpStatus(e.message || 'Erro ao excluir destino', true);
       }
     }
 
@@ -664,7 +781,7 @@
 
     btnSalvarCfg.addEventListener('click', saveCfg);
     impDestino?.addEventListener('change', async () => {
-      const destino = impDestino.value || 'balcao';
+      const destino = normalizeDestinoValue(impDestino.value || 'balcao');
       if (printerCache[destino]) {
         fillPrinterForm(printerCache[destino]);
         return;
@@ -675,6 +792,8 @@
     btnSalvarImpressora.addEventListener('click', salvarPrinterCfg);
     btnListarImpressoras.addEventListener('click', listarImpressorasLocais);
     btnTesteImpressora.addEventListener('click', testarImpressora);
+    btnNovoDestino?.addEventListener('click', criarNovoDestino);
+    btnExcluirDestino?.addEventListener('click', excluirDestinoAtual);
     pixQrArquivo?.addEventListener('change', async () => {
       const file = pixQrArquivo.files?.[0];
       if (!file) return;
@@ -694,7 +813,7 @@
       loadAll: async () => {
         loadCfg();
         atualizarCamposImpressora();
-        await Promise.all([loadPrinterCfg('cozinha'), loadPrinterCfg('balcao'), loadPixCfg(), loadPagCfg(), listarUsuarios(), loadVersions()]);
+        await Promise.all([carregarListaImpressoras('balcao'), loadPixCfg(), loadPagCfg(), listarUsuarios(), loadVersions()]);
       }
     };
   }

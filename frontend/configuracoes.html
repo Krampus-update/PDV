@@ -121,10 +121,11 @@
       <h3 style="margin:0 0 8px 0">Impressora térmica</h3>
       <div class="form-group">
         <label for="impDestino">Destino da impressora</label>
-        <select id="impDestino">
-          <option value="balcao">Balcão / Fechamento</option>
-          <option value="cozinha">Cozinha</option>
-        </select>
+        <select id="impDestino"></select>
+        <div class="printer-grid" style="margin-top:8px">
+          <input id="impNovoDestino" type="text" placeholder="Novo destino (ex.: caixa, bar, delivery)">
+          <button id="btnNovoDestino" class="btn btn-secondary" type="button">Criar</button>
+        </div>
       </div>
       <label style="font-size:12px;display:flex;align-items:center;gap:6px;margin-bottom:8px">
         <input id="impHabilitada" type="checkbox"> Habilitar impressão
@@ -156,6 +157,7 @@
         <button id="btnSalvarImpressora" class="btn btn-primary">Salvar impressora</button>
         <button id="btnListarImpressoras" class="btn btn-secondary">Listar locais</button>
         <button id="btnTesteImpressora" class="btn btn-secondary">Imprimir teste</button>
+        <button id="btnExcluirDestino" class="btn btn-danger">Excluir destino</button>
       </div>
       <div class="form-group" style="margin-top:10px;">
         <label>O que imprimir automaticamente</label>

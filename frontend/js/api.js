@@ -151,29 +151,38 @@ class API {
     }
 
     // ===== IMPRESSÃO TÉRMICA =====
-    static async obterConfigImpressao(tipo = 'balcao') {
-        const query = tipo ? `?tipo=${encodeURIComponent(tipo)}` : '';
+    static async listarConfigsImpressao() {
+        return this.request('GET', '/impressao/configs');
+    }
+
+    static async obterConfigImpressao(destino = 'balcao') {
+        const query = destino ? `?destino=${encodeURIComponent(destino)}` : '';
         return this.request('GET', `/impressao/config${query}`);
     }
 
-    static async salvarConfigImpressao(dados, tipo = 'balcao') {
-        return this.request('PUT', `/impressao/config?tipo=${encodeURIComponent(tipo)}`, {
+    static async salvarConfigImpressao(dados, destino = 'balcao') {
+        return this.request('PUT', `/impressao/config?destino=${encodeURIComponent(destino)}`, {
             ...(dados || {}),
-            destino: tipo
+            destino
         });
+    }
+
+    static async removerConfigImpressao(destino = 'balcao') {
+        const query = destino ? `?destino=${encodeURIComponent(destino)}` : '';
+        return this.request('DELETE', `/impressao/config${query}`);
     }
 
     static async listarImpressorasLocais() {
         return this.request('GET', '/impressao/locais');
     }
 
-    static async testarImpressora(tipo = 'balcao') {
-        const query = tipo ? `?tipo=${encodeURIComponent(tipo)}` : '';
+    static async testarImpressora(destino = 'balcao') {
+        const query = destino ? `?destino=${encodeURIComponent(destino)}` : '';
         return this.request('POST', `/impressao/teste${query}`);
     }
 
-    static async imprimirVenda(vendaId, tipo = 'balcao') {
-        return this.request('POST', `/impressao/venda/${vendaId}?tipo=${encodeURIComponent(tipo)}`);
+    static async imprimirVenda(vendaId, destino = 'balcao') {
+        return this.request('POST', `/impressao/venda/${vendaId}?destino=${encodeURIComponent(destino)}`);
     }
 
     // ===== VENDAS =====
