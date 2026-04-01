@@ -3,6 +3,7 @@ import { initializeDatabase } from './src/database/database.js';
 import http from 'http';
 import { initRealtime } from './src/services/realtimeService.js';
 import { iniciarAutoBackup } from './src/services/backupService.js';
+import { iniciarPollingIfood } from './src/services/ifoodIntegrationService.js';
 
 const PORT = process.env.PORT || 3000;
 
@@ -15,6 +16,7 @@ async function startServer() {
     const server = http.createServer(app);
     initRealtime(server);
     iniciarAutoBackup();
+    iniciarPollingIfood({ intervalMs: 30000 });
 
     server.listen(PORT, '0.0.0.0', () => {
       console.log(`\n===================================`);

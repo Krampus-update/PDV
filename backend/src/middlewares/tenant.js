@@ -1,6 +1,6 @@
 import { sanitizeTenantCode, tenantExists, initializeTenantDatabase, runWithTenant } from '../database/database.js';
 
-const PUBLIC_WITHOUT_TENANT = new Set(['/', '/status']);
+const PUBLIC_WITHOUT_TENANT = new Set(['/', '/status', '/integracoes/ifood/webhook']);
 
 function isPublicDevPath(pathname) {
   return pathname === '/dev' || pathname.startsWith('/dev/');

@@ -23,9 +23,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const modal = document.getElementById('modalDetalhes');
   const btnFecharModal = document.getElementById('btnFecharModal');
   const tituloPedido = document.getElementById('tituloPedido');
+  const origemPedido = document.getElementById('origemPedido');
+  const clientePedido = document.getElementById('clientePedido');
+  const codigoPedido = document.getElementById('codigoPedido');
   const statusPedido = document.getElementById('statusPedido');
   const horarioPedido = document.getElementById('horarioPedido');
   const tempoEspera = document.getElementById('tempoEspera');
+  const tempoEntregadorPedido = document.getElementById('tempoEntregadorPedido');
+  const tempoEntregaPedido = document.getElementById('tempoEntregaPedido');
   const itensPedido = document.getElementById('itensPedido');
   const observacoesPedido = document.getElementById('observacoesPedido');
   const btnMarcarPronto = document.getElementById('btnMarcarPronto');
@@ -61,6 +66,11 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function tituloComanda(venda) {
+    if (venda?.nome_comanda) return venda.nome_comanda;
+    if (venda?.origem === 'ifood' && venda?.origem_codigo) {
+      const cliente = venda?.cliente_nome || venda?.observacoes || 'Cliente';
+      return `iFood - ${cliente} (${venda.origem_codigo})`;
+    }
     if (venda?.mesa) return `Mesa ${venda.mesa}`;
     return `Balcão #${venda?.id || '--'}`;
   }
@@ -128,10 +138,15 @@ document.addEventListener('DOMContentLoaded', () => {
       const p = await API.obterVenda(id);
       pedidoAtivo = p;
       tituloPedido.textContent = `Comanda ${tituloComanda(p)}`;
+      origemPedido.textContent = p.origem || 'pdv';
+      clientePedido.textContent = p.cliente_nome || p.cliente_nome_externo || '--';
+      codigoPedido.textContent = p.origem_codigo || p.numero_pedido || '--';
       statusPedido.textContent = p.status;
       statusPedido.className = `status-badge ${p.status}`;
       horarioPedido.textContent = formatarData(p.created_at);
       tempoEspera.textContent = calcularTempoEspera(p.created_at);
+      tempoEntregadorPedido.textContent = p.tempo_ate_entregador_minutos ? `${p.tempo_ate_entregador_minutos} min` : '--';
+      tempoEntregaPedido.textContent = p.entrega_estimativa_minutos ? `${p.entrega_estimativa_minutos} min` : '--';
       observacoesPedido.textContent = p.observacoes || '--';
 
       const itensCozinha = (p.itens || []).filter((i) => Number(i.produto_vai_cozinha) === 1);

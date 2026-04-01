@@ -120,7 +120,7 @@ class PDV {
         this.elementos.listaVendas.innerHTML = this.vendas.map(v => `
             <div class="item-venda ${this.vendaAtiva?.id === v.id ? 'ativo' : ''}" onclick="pdv.selecionarVenda(${v.id})">
                 <div class="item-venda-tipo">${v.tipo}</div>
-                <div class="item-venda-numero">${v.numero_pedido ? `#${v.numero_pedido}` : 'Comanda'}</div>
+                <div class="item-venda-numero">${v.nome_comanda || (v.origem === 'ifood' && v.origem_codigo ? `iFood (${v.origem_codigo})` : (v.numero_pedido ? `#${v.numero_pedido}` : 'Comanda'))}</div>
                 <div class="item-venda-total">${formatarMoeda(v.total)}</div>
             </div>
         `).join('');
@@ -226,6 +226,9 @@ class PDV {
         this.elementos.totalVenda.textContent = formatarMoeda(total);
 
         // Atualizar número da comanda
+        if (this.vendaAtiva.nome_comanda) {
+            this.elementos.numeroComanda.textContent = this.vendaAtiva.nome_comanda;
+        } else
         if (this.vendaAtiva.numero_pedido) {
             this.elementos.numeroComanda.textContent = `#${this.vendaAtiva.numero_pedido}`;
         } else {

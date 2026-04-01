@@ -405,6 +405,31 @@ class API {
         return this.request('POST', '/pagamentos/processar', dados || {});
     }
 
+    // ===== iFOOD / INTEGRAÇÕES =====
+    static async obterConfigIfood() {
+        return this.request('GET', '/integracoes/ifood/config');
+    }
+
+    static async salvarConfigIfood(dados) {
+        return this.request('PUT', '/integracoes/ifood/config', dados || {});
+    }
+
+    static async iniciarLoginIfood() {
+        return this.request('POST', '/integracoes/ifood/login/start', {});
+    }
+
+    static async finalizarLoginIfood(dados) {
+        return this.request('POST', '/integracoes/ifood/login/finish', dados || {});
+    }
+
+    static async sincronizarIfoodWebhook(dados) {
+        return this.request('POST', '/integracoes/ifood/webhook', dados || {});
+    }
+
+    static async marcarIfoodPronto(vendaId) {
+        return this.request('POST', `/integracoes/ifood/${vendaId}/pronto`);
+    }
+
     // ===== PROMOÇÕES =====
     static async obterPromocoes(ativo = null) {
         const query = ativo === null ? '' : `?ativo=${ativo ? 1 : 0}`;

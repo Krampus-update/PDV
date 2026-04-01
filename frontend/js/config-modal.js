@@ -42,6 +42,7 @@
         <div class="cfg-popup-tabs">
           <button class="cfg-popup-tab active" data-tab="restaurante" type="button">Restaurante</button>
           <button class="cfg-popup-tab" data-tab="impressao" type="button">Impressão</button>
+          <button class="cfg-popup-tab" data-tab="ifood" type="button">iFood</button>
           <button class="cfg-popup-tab" data-tab="equipe" type="button">Equipe</button>
         </div>
         <div class="cfg-popup-body">
@@ -195,9 +196,70 @@
                   <input id="pagPagseguroToken" type="password" placeholder="Token PagSeguro">
                 </div>
                 <div class="cfg-actions">
-                  <button id="btnSalvarPagamento" class="btn btn-primary" type="button">Salvar gateway</button>
+                <button id="btnSalvarPagamento" class="btn btn-primary" type="button">Salvar gateway</button>
                 </div>
                 <small id="pagStatus" style="display:block;margin-top:8px;color:#64748b"></small>
+              </div>
+            </div>
+          </section>
+
+          <section class="cfg-popup-pane" data-pane="ifood">
+            <div class="cfg-grid">
+              <div class="cfg-card">
+                <h4 style="margin:0 0 8px;color:#0f172a">Conexão iFood</h4>
+                <label style="font-size:12px;display:flex;align-items:center;gap:6px;margin-bottom:8px">
+                  <input id="ifoodAtivo" type="checkbox"> Ativar integração
+                </label>
+                <div class="form-group">
+                  <label for="ifoodMode">Tipo de app</label>
+                  <select id="ifoodMode">
+                    <option value="distributed">Distribuído / Login guiado</option>
+                    <option value="centralized">Centralizado</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="ifoodClientId">Client ID</label>
+                  <input id="ifoodClientId" type="text" placeholder="Client ID do app">
+                </div>
+                <div class="form-group">
+                  <label for="ifoodClientSecret">Client Secret</label>
+                  <input id="ifoodClientSecret" type="password" placeholder="Client Secret do app">
+                </div>
+                <div class="form-group">
+                  <label for="ifoodMerchantId">Merchant ID</label>
+                  <input id="ifoodMerchantId" type="text" placeholder="Preenchido após login">
+                </div>
+                <div class="cfg-actions">
+                  <button id="btnIfoodLogin" class="btn btn-primary" type="button">Login iFood</button>
+                  <button id="btnIfoodFinishLogin" class="btn btn-secondary" type="button">Finalizar login</button>
+                </div>
+                <small id="ifoodLoginStatus" style="display:block;margin-top:8px;color:#64748b"></small>
+              </div>
+              <div class="cfg-card">
+                <h4 style="margin:0 0 8px;color:#0f172a">Regras da integração</h4>
+                <div class="form-group">
+                  <label for="ifoodInventoryMode">Baixa de estoque</label>
+                  <select id="ifoodInventoryMode">
+                    <option value="ao_pronto">Ao marcar como pronto</option>
+                    <option value="na_abertura">Ao abrir a comanda</option>
+                  </select>
+                </div>
+                <div class="form-group">
+                  <label for="ifoodMatchThreshold">Similaridade mínima</label>
+                  <input id="ifoodMatchThreshold" type="number" min="0" max="1" step="0.01" value="0.68">
+                </div>
+                <div class="form-group">
+                  <label for="ifoodWebhookSecret">Webhook secret</label>
+                  <input id="ifoodWebhookSecret" type="password" placeholder="Segredo do webhook">
+                </div>
+                <div class="form-group">
+                  <label for="ifoodApiBaseUrl">Base URL da API</label>
+                  <input id="ifoodApiBaseUrl" type="text" placeholder="https://...">
+                </div>
+                <div class="cfg-actions">
+                  <button id="btnSalvarIfood" class="btn btn-primary" type="button">Salvar iFood</button>
+                </div>
+                <small id="ifoodStatus" style="display:block;margin-top:8px;color:#64748b"></small>
               </div>
             </div>
           </section>
@@ -312,6 +374,20 @@
     const pagPagseguroToken = modal.querySelector('#pagPagseguroToken');
     const btnSalvarPagamento = modal.querySelector('#btnSalvarPagamento');
     const pagStatus = modal.querySelector('#pagStatus');
+    const ifoodAtivo = modal.querySelector('#ifoodAtivo');
+    const ifoodMode = modal.querySelector('#ifoodMode');
+    const ifoodClientId = modal.querySelector('#ifoodClientId');
+    const ifoodClientSecret = modal.querySelector('#ifoodClientSecret');
+    const ifoodMerchantId = modal.querySelector('#ifoodMerchantId');
+    const ifoodInventoryMode = modal.querySelector('#ifoodInventoryMode');
+    const ifoodMatchThreshold = modal.querySelector('#ifoodMatchThreshold');
+    const ifoodWebhookSecret = modal.querySelector('#ifoodWebhookSecret');
+    const ifoodApiBaseUrl = modal.querySelector('#ifoodApiBaseUrl');
+    const btnSalvarIfood = modal.querySelector('#btnSalvarIfood');
+    const btnIfoodLogin = modal.querySelector('#btnIfoodLogin');
+    const btnIfoodFinishLogin = modal.querySelector('#btnIfoodFinishLogin');
+    const ifoodLoginStatus = modal.querySelector('#ifoodLoginStatus');
+    const ifoodStatus = modal.querySelector('#ifoodStatus');
 
     const novoNome = modal.querySelector('#novoNome');
     const novoLogin = modal.querySelector('#novoLogin');
@@ -336,6 +412,14 @@
     function setPagStatus(msg, isError) {
       pagStatus.textContent = msg || '';
       pagStatus.style.color = isError ? '#b91c1c' : '#64748b';
+    }
+    function setIfoodStatus(msg, isError) {
+      ifoodStatus.textContent = msg || '';
+      ifoodStatus.style.color = isError ? '#b91c1c' : '#64748b';
+    }
+    function setIfoodLoginStatus(msg, isError) {
+      ifoodLoginStatus.textContent = msg || '';
+      ifoodLoginStatus.style.color = isError ? '#b91c1c' : '#64748b';
     }
 
     function setPixPreview(src) {
@@ -643,6 +727,88 @@
       }
     }
 
+    async function loadIfoodCfg() {
+      try {
+        const cfg = await API.obterConfigIfood();
+        ifoodAtivo.checked = !!cfg.ativo;
+        ifoodMode.value = cfg.mode || 'distributed';
+        ifoodClientId.value = cfg.client_id || '';
+        ifoodClientSecret.value = cfg.client_secret || '';
+        ifoodMerchantId.value = cfg.merchant_id || '';
+        ifoodInventoryMode.value = cfg.inventory_mode || 'ao_pronto';
+        ifoodMatchThreshold.value = String(cfg.match_threshold ?? 0.68);
+        ifoodWebhookSecret.value = cfg.webhook_secret || '';
+        ifoodApiBaseUrl.value = cfg.api_base_url || '';
+        setIfoodStatus('Configuração iFood carregada.', false);
+      } catch (e) {
+        setIfoodStatus(e.message || 'Erro ao carregar iFood', true);
+      }
+    }
+
+    async function salvarIfoodCfg() {
+      try {
+        await API.salvarConfigIfood({
+          ativo: !!ifoodAtivo.checked,
+          mode: ifoodMode.value,
+          client_id: ifoodClientId.value.trim(),
+          client_secret: ifoodClientSecret.value.trim(),
+          merchant_id: ifoodMerchantId.value.trim(),
+          inventory_mode: ifoodInventoryMode.value,
+          match_threshold: Number(ifoodMatchThreshold.value || 0.68),
+          webhook_secret: ifoodWebhookSecret.value.trim(),
+          api_base_url: ifoodApiBaseUrl.value.trim()
+        });
+        setIfoodStatus('Configuração iFood salva.', false);
+      } catch (e) {
+        setIfoodStatus(e.message || 'Erro ao salvar iFood', true);
+      }
+    }
+
+    async function iniciarLoginIfood() {
+      try {
+        await API.salvarConfigIfood({
+          ativo: !!ifoodAtivo.checked,
+          mode: ifoodMode.value,
+          client_id: ifoodClientId.value.trim(),
+          client_secret: ifoodClientSecret.value.trim(),
+          merchant_id: ifoodMerchantId.value.trim(),
+          inventory_mode: ifoodInventoryMode.value,
+          match_threshold: Number(ifoodMatchThreshold.value || 0.68),
+          webhook_secret: ifoodWebhookSecret.value.trim(),
+          api_base_url: ifoodApiBaseUrl.value.trim()
+        });
+        const resp = await API.iniciarLoginIfood();
+        const texto = [
+          `Código: ${resp.user_code || '--'}`,
+          resp.verification_url_complete || resp.verification_url || ''
+        ].filter(Boolean).join('\n');
+        setIfoodLoginStatus(texto, false);
+        const aberto = resp.verification_url_complete || resp.verification_url;
+        if (aberto) {
+          window.open(aberto, '_blank', 'noopener,noreferrer');
+        }
+      } catch (e) {
+        setIfoodLoginStatus(e.message || 'Erro ao iniciar login iFood', true);
+      }
+    }
+
+    async function finalizarLoginIfood() {
+      try {
+        const authorization_code = window.prompt('Cole o authorization_code do iFood:');
+        if (!authorization_code) return;
+        const resp = await API.finalizarLoginIfood({
+          authorization_code,
+          client_id: ifoodClientId.value.trim(),
+          client_secret: ifoodClientSecret.value.trim()
+        });
+        ifoodAtivo.checked = !!resp.ativo;
+        ifoodMerchantId.value = resp.merchant_id || ifoodMerchantId.value;
+        setIfoodLoginStatus('iFood conectado com sucesso.', false);
+      } catch (e) {
+        setIfoodLoginStatus(e.message || 'Erro ao finalizar login iFood', true);
+      }
+    }
+
     function renderUsers() {
       const term = String(filtroUsuario?.value || '').toLowerCase().trim();
       const filtered = usersCache.filter((u) => {
@@ -806,6 +972,9 @@
     });
     btnSalvarPix.addEventListener('click', salvarPixCfg);
     btnSalvarPagamento.addEventListener('click', salvarPagCfg);
+    btnSalvarIfood.addEventListener('click', salvarIfoodCfg);
+    btnIfoodLogin.addEventListener('click', iniciarLoginIfood);
+    btnIfoodFinishLogin.addEventListener('click', finalizarLoginIfood);
     filtroUsuario.addEventListener('input', renderUsers);
     btnCriarUsuario.addEventListener('click', criarUsuario);
 
@@ -813,7 +982,7 @@
       loadAll: async () => {
         loadCfg();
         atualizarCamposImpressora();
-        await Promise.all([carregarListaImpressoras('balcao'), loadPixCfg(), loadPagCfg(), listarUsuarios(), loadVersions()]);
+        await Promise.all([carregarListaImpressoras('balcao'), loadPixCfg(), loadPagCfg(), loadIfoodCfg(), listarUsuarios(), loadVersions()]);
       }
     };
   }

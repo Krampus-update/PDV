@@ -16,6 +16,7 @@ import pixRoutes from './pix.js';
 import pagamentosRoutes from './pagamentos.js';
 import promocoesRoutes from './promocoes.js';
 import devRoutes from './dev.js';
+import integracoesRoutes from './integracoes.js';
 
 const router = express.Router();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -50,6 +51,7 @@ router.get('/', (req, res) => {
       pix: '/api/pix',
       pagamentos: '/api/pagamentos',
       promocoes: '/api/promocoes',
+      integracoes: '/api/integracoes',
       dev: '/api/dev'
     }
   });
@@ -69,6 +71,7 @@ router.use('/caixa', caixaRoutes);
 router.use('/pix', pixRoutes);
 router.use('/pagamentos', pagamentosRoutes);
 router.use('/promocoes', promocoesRoutes);
+router.use('/integracoes', integracoesRoutes);
 router.use('/dev', devRoutes);
 
 // Health check

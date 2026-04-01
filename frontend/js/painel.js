@@ -44,6 +44,11 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function tituloComanda(venda) {
+    if (venda?.nome_comanda) return venda.nome_comanda;
+    if (venda?.origem === 'ifood' && venda?.origem_codigo) {
+      const cliente = venda?.cliente_nome || venda?.observacoes || 'Cliente';
+      return `iFood - ${cliente} (${venda.origem_codigo})`;
+    }
     if (venda?.mesa) return `Mesa ${venda.mesa}`;
     return `Balcão #${venda?.id || '--'}`;
   }

@@ -3,14 +3,24 @@ import { dbRun, dbGet, dbAll } from '../database/database.js';
 class VendaItemModel {
   static async criar(dados) {
     const result = await dbRun(
-      `INSERT INTO venda_itens (venda_id, produto_id, quantidade, preco_unitario, consumo_estoque, subtotal, observacoes) 
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO venda_itens (
+        venda_id,
+        produto_id,
+        quantidade,
+        preco_unitario,
+        consumo_estoque,
+        estoque_baixado,
+        subtotal,
+        observacoes
+      ) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         dados.venda_id,
         dados.produto_id,
         dados.quantidade,
         dados.preco_unitario,
         dados.consumo_estoque || 1,
+        dados.estoque_baixado === undefined ? 1 : (dados.estoque_baixado ? 1 : 0),
         dados.subtotal,
         dados.observacoes || null
       ]
@@ -41,9 +51,9 @@ class VendaItemModel {
     const values = [];
 
     for (const [key, value] of Object.entries(dados)) {
-      if (['quantidade', 'preco_unitario', 'subtotal', 'observacoes'].includes(key)) {
+      if (['quantidade', 'preco_unitario', 'subtotal', 'observacoes', 'estoque_baixado'].includes(key)) {
         fields.push(`${key} = ?`);
-        values.push(value);
+        values.push(key === 'estoque_baixado' ? (value ? 1 : 0) : value);
       }
       if (key === 'consumo_estoque') {
         fields.push('consumo_estoque = ?');
@@ -73,6 +83,7 @@ class VendaItemModel {
         vi.quantidade,
         vi.preco_unitario,
         vi.consumo_estoque,
+        vi.estoque_baixado,
         vi.subtotal,
         vi.observacoes,
         p.id as produto_id,

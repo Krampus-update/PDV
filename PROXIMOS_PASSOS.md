@@ -160,7 +160,7 @@ Preparativos já iniciados para Fase 5:
 - [x] melhorar a o sistema de login/autenticação (ex.: JWT, sessões, recuperação de senha) para segurança e gestão de usuários
 - [ ] correção de bugs e melhorias pós-deploy (incluindo mas não limitado a refatorar todas as telas do app e limpar codigos comentados e não utilizados)
 - [x] refatorar as telas para seguir o padrão material ui (ou outro design system) para melhorar a consistência visual e usabilidade do aplicativo
-
+ 
 ---
 
 ## 📚 Documentação Disponível

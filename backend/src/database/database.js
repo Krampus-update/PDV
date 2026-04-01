@@ -185,6 +185,15 @@ function tenantSchemaQueries() {
       mesa TEXT,
       cliente_id INTEGER,
       caixa_sessao_id INTEGER,
+      origem TEXT DEFAULT 'pdv',
+      origem_codigo TEXT,
+      cliente_nome_externo TEXT,
+      nome_comanda TEXT,
+      origem_payload_json TEXT,
+      entrega_estimativa_minutos INTEGER,
+      tempo_ate_entregador_minutos INTEGER,
+      tempo_preparo_minutos INTEGER,
+      entrega_status_texto TEXT,
       subtotal_bruto DECIMAL(10, 2) NOT NULL DEFAULT 0,
       desconto_tipo TEXT,
       desconto_valor DECIMAL(10,2) NOT NULL DEFAULT 0,
@@ -213,6 +222,7 @@ function tenantSchemaQueries() {
       quantidade INTEGER NOT NULL,
       preco_unitario DECIMAL(10, 2) NOT NULL,
       consumo_estoque INTEGER NOT NULL DEFAULT 1,
+      estoque_baixado BOOLEAN DEFAULT 1,
       subtotal DECIMAL(10, 2) NOT NULL,
       observacoes TEXT,
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
@@ -307,6 +317,13 @@ function tenantSchemaQueries() {
       aberto_em DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
       fechado_em DATETIME
     )`
+    ,
+    `CREATE TABLE IF NOT EXISTS ifood_eventos_processados (
+      event_id TEXT PRIMARY KEY,
+      order_id TEXT,
+      event_type TEXT,
+      processed_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`
   ];
 }
 
@@ -378,6 +395,33 @@ async function initializeTenantDatabase(code) {
   if (!cols.some((c) => c.name === 'mesa')) {
     await runQuery(db, 'ALTER TABLE vendas ADD COLUMN mesa TEXT');
   }
+  if (!cols.some((c) => c.name === 'origem')) {
+    await runQuery(db, "ALTER TABLE vendas ADD COLUMN origem TEXT DEFAULT 'pdv'");
+  }
+  if (!cols.some((c) => c.name === 'origem_codigo')) {
+    await runQuery(db, 'ALTER TABLE vendas ADD COLUMN origem_codigo TEXT');
+  }
+  if (!cols.some((c) => c.name === 'cliente_nome_externo')) {
+    await runQuery(db, 'ALTER TABLE vendas ADD COLUMN cliente_nome_externo TEXT');
+  }
+  if (!cols.some((c) => c.name === 'nome_comanda')) {
+    await runQuery(db, 'ALTER TABLE vendas ADD COLUMN nome_comanda TEXT');
+  }
+  if (!cols.some((c) => c.name === 'origem_payload_json')) {
+    await runQuery(db, 'ALTER TABLE vendas ADD COLUMN origem_payload_json TEXT');
+  }
+  if (!cols.some((c) => c.name === 'entrega_estimativa_minutos')) {
+    await runQuery(db, 'ALTER TABLE vendas ADD COLUMN entrega_estimativa_minutos INTEGER');
+  }
+  if (!cols.some((c) => c.name === 'tempo_ate_entregador_minutos')) {
+    await runQuery(db, 'ALTER TABLE vendas ADD COLUMN tempo_ate_entregador_minutos INTEGER');
+  }
+  if (!cols.some((c) => c.name === 'tempo_preparo_minutos')) {
+    await runQuery(db, 'ALTER TABLE vendas ADD COLUMN tempo_preparo_minutos INTEGER');
+  }
+  if (!cols.some((c) => c.name === 'entrega_status_texto')) {
+    await runQuery(db, 'ALTER TABLE vendas ADD COLUMN entrega_status_texto TEXT');
+  }
   if (!cols.some((c) => c.name === 'cliente_id')) {
     await runQuery(db, 'ALTER TABLE vendas ADD COLUMN cliente_id INTEGER');
   }
@@ -429,6 +473,9 @@ async function initializeTenantDatabase(code) {
   const itensCols = await dbAll("PRAGMA table_info(venda_itens)", [], code);
   if (!itensCols.some((c) => c.name === 'consumo_estoque')) {
     await runQuery(db, 'ALTER TABLE venda_itens ADD COLUMN consumo_estoque INTEGER NOT NULL DEFAULT 1');
+  }
+  if (!itensCols.some((c) => c.name === 'estoque_baixado')) {
+    await runQuery(db, 'ALTER TABLE venda_itens ADD COLUMN estoque_baixado BOOLEAN DEFAULT 1');
   }
   if (!cols.some((c) => c.name === 'promocao_aplicada_id')) {
     await runQuery(db, 'ALTER TABLE vendas ADD COLUMN promocao_aplicada_id INTEGER');
@@ -486,6 +533,8 @@ async function initializeTenantDatabase(code) {
     'CREATE INDEX IF NOT EXISTS idx_vendas_tipo ON vendas(tipo)',
     'CREATE INDEX IF NOT EXISTS idx_vendas_status ON vendas(status)',
     'CREATE INDEX IF NOT EXISTS idx_vendas_created_at ON vendas(created_at)',
+    'CREATE INDEX IF NOT EXISTS idx_vendas_origem ON vendas(origem)',
+    'CREATE INDEX IF NOT EXISTS idx_vendas_origem_codigo ON vendas(origem, origem_codigo)',
     'CREATE INDEX IF NOT EXISTS idx_vendas_cliente_id ON vendas(cliente_id)',
     'CREATE INDEX IF NOT EXISTS idx_vendas_caixa_sessao_id ON vendas(caixa_sessao_id)',
     'CREATE INDEX IF NOT EXISTS idx_vendas_promocao_aplicada_id ON vendas(promocao_aplicada_id)',
@@ -503,7 +552,8 @@ async function initializeTenantDatabase(code) {
     'CREATE INDEX IF NOT EXISTS idx_caixa_fechado_em ON caixa_sessoes(fechado_em)',
     'CREATE INDEX IF NOT EXISTS idx_promocoes_ativo ON promocoes(ativo)',
     'CREATE INDEX IF NOT EXISTS idx_promocoes_produto_id ON promocoes(produto_id)',
-    'CREATE INDEX IF NOT EXISTS idx_promocoes_categoria ON promocoes(categoria)'
+    'CREATE INDEX IF NOT EXISTS idx_promocoes_categoria ON promocoes(categoria)',
+    'CREATE INDEX IF NOT EXISTS idx_ifood_eventos_order ON ifood_eventos_processados(order_id)'
   ];
   for (const query of indexQueries) await runQuery(db, query);
 

@@ -12,8 +12,25 @@ class VendaModel {
     }
 
     const result = await dbRun(
-      `INSERT INTO vendas (tipo, status, numero_pedido, mesa, cliente_id, caixa_sessao_id, total) 
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO vendas (
+        tipo,
+        status,
+        numero_pedido,
+        mesa,
+        cliente_id,
+        caixa_sessao_id,
+        origem,
+        origem_codigo,
+        cliente_nome_externo,
+        nome_comanda,
+        origem_payload_json,
+        entrega_estimativa_minutos,
+        tempo_ate_entregador_minutos,
+        tempo_preparo_minutos,
+        entrega_status_texto,
+        total
+      ) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         dados.tipo,
         dados.status || 'aberta',
@@ -21,6 +38,15 @@ class VendaModel {
         dados.mesa || null,
         dados.cliente_id || null,
         dados.caixa_sessao_id || null,
+        dados.origem || 'pdv',
+        dados.origem_codigo || null,
+        dados.cliente_nome_externo || null,
+        dados.nome_comanda || null,
+        dados.origem_payload_json || null,
+        dados.entrega_estimativa_minutos ?? null,
+        dados.tempo_ate_entregador_minutos ?? null,
+        dados.tempo_preparo_minutos ?? null,
+        dados.entrega_status_texto || null,
         dados.total || 0
       ]
     );
@@ -31,7 +57,11 @@ class VendaModel {
       numero_pedido: numero_pedido,
       mesa: dados.mesa || null,
       cliente_id: dados.cliente_id || null,
-      caixa_sessao_id: dados.caixa_sessao_id || null
+      caixa_sessao_id: dados.caixa_sessao_id || null,
+      origem: dados.origem || 'pdv',
+      origem_codigo: dados.origem_codigo || null,
+      cliente_nome_externo: dados.cliente_nome_externo || null,
+      nome_comanda: dados.nome_comanda || null
     };
   }
 
@@ -87,6 +117,17 @@ class VendaModel {
     return dbAll(query, values);
   }
 
+  static async obterPorOrigem(origem, origem_codigo) {
+    return dbGet(
+      `SELECT v.*, c.nome as cliente_nome, c.telefone as cliente_telefone
+       FROM vendas v
+       LEFT JOIN clientes c ON c.id = v.cliente_id
+       WHERE v.origem = ? AND v.origem_codigo = ?
+       LIMIT 1`,
+      [origem, origem_codigo]
+    );
+  }
+
   static async obterEmPreparo() {
     return dbAll(
       `SELECT DISTINCT v.*
@@ -139,7 +180,16 @@ class VendaModel {
           'pagamento_transacao_id',
           'pix_payload',
           'pix_chave_utilizada',
-          'promocao_aplicada_id'
+          'promocao_aplicada_id',
+          'origem',
+          'origem_codigo',
+          'cliente_nome_externo',
+          'nome_comanda',
+          'origem_payload_json',
+          'entrega_estimativa_minutos',
+          'tempo_ate_entregador_minutos',
+          'tempo_preparo_minutos',
+          'entrega_status_texto'
         ].includes(key)
       ) {
         fields.push(`${key} = ?`);
