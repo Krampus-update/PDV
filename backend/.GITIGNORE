@@ -1,2 +1,3 @@
 backend/logs/*.logs
 backend/tenants/*.db
+.env
