@@ -44,6 +44,10 @@ async function tentarImpressaoAutomatica({ vendaId, tipo, flag }) {
   }
 }
 
+function bonusObs(promocaoId) {
+  return `Brinde promoção #${promocaoId}`;
+}
+
 class VendaController {
   static promocaoAtivaNoMomento(promo) {
     if (!promo || Number(promo.ativo || 0) !== 1) return false;
@@ -89,7 +93,12 @@ class VendaController {
     if (!VendaController.promocaoAtivaNoMomento(promo)) return { desconto: 0, promocao: null };
 
     if (String(promo.tipo || '') === 'combo_produto') {
-      const itensProduto = (itens || []).filter((i) => Number(i.produto_id) === Number(promo.produto_id));
+      const variacaoAlvo = String(promo.variacao_nome || '').trim().toLowerCase();
+      const itensProduto = (itens || []).filter((i) => {
+        if (Number(i.produto_id) !== Number(promo.produto_id)) return false;
+        if (!variacaoAlvo) return true;
+        return String(i.observacoes || '').trim().toLowerCase() === variacaoAlvo;
+      });
       if (!itensProduto.length) return { desconto: 0, promocao: promo };
       const qtd = itensProduto.reduce((sum, i) => sum + Number(i.quantidade || 0), 0);
       const subtotalProduto = itensProduto.reduce((sum, i) => sum + Number(i.subtotal || 0), 0);
@@ -106,6 +115,92 @@ class VendaController {
     }
 
     return { desconto: 0, promocao: promo };
+  }
+
+  static calcularQuantidadeBonusPromocao({ promo, itens }) {
+    if (String(promo?.tipo || '') !== 'ganhe_produto') return 0;
+    if (!promo.produto_id || !promo.produto_bonus_id) return 0;
+    const variacaoAlvo = String(promo.variacao_nome || '').trim().toLowerCase();
+    const itensProduto = (itens || []).filter((i) => {
+      if (Number(i.produto_id) !== Number(promo.produto_id)) return false;
+      if (String(i.observacoes || '').startsWith('Brinde promoção #')) return false;
+      if (!variacaoAlvo) return true;
+      return String(i.observacoes || '').trim().toLowerCase() === variacaoAlvo;
+    });
+    const qtd = itensProduto.reduce((sum, i) => sum + Number(i.quantidade || 0), 0);
+    const packQtd = Math.max(1, Number(promo.quantidade_min || 0));
+    if (qtd < packQtd) return 0;
+    const repetir = Number(promo.repetir_na_venda ?? 1) === 1;
+    const grupos = repetir ? Math.floor(qtd / packQtd) : 1;
+    return grupos * Math.max(1, Number(promo.produto_bonus_quantidade || 1));
+  }
+
+  static async sincronizarBrindesPromocionais(vendaId) {
+    const venda = await VendaModel.obterPorId(vendaId);
+    if (!venda || String(venda.status) === 'fechada') return;
+    const promocoes = await PromocaoModel.listar({ ativo: true });
+    const itens = await VendaItemModel.obterPorVenda(vendaId);
+    const desejados = new Map();
+
+    for (const promo of promocoes || []) {
+      if (!VendaController.promocaoAtivaNoMomento(promo)) continue;
+      if (String(promo.tipo || '') !== 'ganhe_produto') continue;
+      const quantidade = VendaController.calcularQuantidadeBonusPromocao({ promo, itens });
+      if (quantidade > 0) {
+        desejados.set(Number(promo.id), { promo, quantidade });
+      }
+    }
+
+    const brindesAtuais = itens.filter((i) => String(i.observacoes || '').startsWith('Brinde promoção #'));
+    for (const item of brindesAtuais) {
+      const match = String(item.observacoes || '').match(/#(\d+)/);
+      const promoId = match ? Number(match[1]) : 0;
+      const desejado = desejados.get(promoId);
+      if (!desejado || Number(desejado.promo.produto_bonus_id) !== Number(item.produto_id)) {
+        await ProdutoModel.atualizarEstoque(item.produto_id, Number(item.quantidade || 0));
+        await VendaItemModel.deletar(item.id);
+        continue;
+      }
+
+      const qtdAtual = Number(item.quantidade || 0);
+      const qtdDesejada = Number(desejado.quantidade || 0);
+      if (qtdAtual === qtdDesejada) continue;
+      const produtoBonus = await ProdutoModel.obterPorId(item.produto_id);
+      if (qtdDesejada > qtdAtual) {
+        const delta = qtdDesejada - qtdAtual;
+        const disponivel = Math.max(0, Number(produtoBonus?.estoque || 0));
+        const aplicado = Math.min(delta, disponivel);
+        if (aplicado > 0) {
+          const novaQtd = qtdAtual + aplicado;
+          await ProdutoModel.atualizarEstoque(item.produto_id, -aplicado);
+          await VendaItemModel.atualizar(item.id, { quantidade: novaQtd, subtotal: 0 });
+        }
+      } else {
+        const devolver = qtdAtual - qtdDesejada;
+        await ProdutoModel.atualizarEstoque(item.produto_id, devolver);
+        if (qtdDesejada <= 0) await VendaItemModel.deletar(item.id);
+        else await VendaItemModel.atualizar(item.id, { quantidade: qtdDesejada, subtotal: 0 });
+      }
+      desejados.delete(promoId);
+    }
+
+    for (const { promo, quantidade } of desejados.values()) {
+      const produtoBonus = await ProdutoModel.obterPorId(promo.produto_bonus_id);
+      if (!produtoBonus || !produtoBonus.ativo) continue;
+      const qtd = Math.min(quantidade, Math.max(0, Number(produtoBonus.estoque || 0)));
+      if (qtd <= 0) continue;
+      await ProdutoModel.atualizarEstoque(produtoBonus.id, -qtd);
+      await VendaItemModel.criar({
+        venda_id: vendaId,
+        produto_id: produtoBonus.id,
+        quantidade: qtd,
+        preco_unitario: 0,
+        consumo_estoque: 1,
+        subtotal: 0,
+        observacoes: bonusObs(promo.id),
+        status_item: 'anotado'
+      });
+    }
   }
 
   static async calcularMelhorPromocaoAutomatica({ venda, itens }) {
@@ -128,6 +223,7 @@ class VendaController {
   static async aplicarPromocaoAutomaticaSeElegivel(vendaId) {
     const vendaBase = await VendaModel.obterPorId(vendaId);
     if (!vendaBase || String(vendaBase.status) === 'fechada') return null;
+    await VendaController.sincronizarBrindesPromocionais(vendaId);
     const tipoAtual = String(vendaBase.desconto_tipo || 'nenhum').toLowerCase();
     const ehManual = ['percentual', 'fixo', 'leve3pague2'].includes(tipoAtual);
     if (ehManual) return vendaBase;
@@ -352,6 +448,9 @@ class VendaController {
       if (!venda) {
         return res.status(404).json({ error: 'Venda não encontrada' });
       }
+      if (String(venda.aprovacao_status || 'aprovado') === 'pendente') {
+        return res.status(400).json({ error: 'Pedido aguardando aprovação' });
+      }
 
       const itens = await VendaItemModel.obterPorVenda(id);
       res.json({ ...venda, itens });
@@ -418,6 +517,9 @@ class VendaController {
       if (!venda) {
         return res.status(404).json({ error: 'Venda não encontrada' });
       }
+      if (String(venda.aprovacao_status || 'aprovado') === 'pendente') {
+        return res.status(400).json({ error: 'Pedido aguardando aprovação' });
+      }
 
       const produto = await ProdutoModel.obterPorId(produto_id);
       if (!produto) {
@@ -469,7 +571,8 @@ class VendaController {
           String(i.produto_id) === String(produto_id) &&
           Number(i.preco_unitario) === Number(precoUnitario) &&
           String(i.observacoes || '').trim() === String(obsNorm || '').trim() &&
-          Number(i.consumo_estoque || 1) === Number(consumo || 1)
+          Number(i.consumo_estoque || 1) === Number(consumo || 1) &&
+          String(i.status_item || 'anotado') === 'anotado'
       );
       if(existente){
         const novaQtd = existente.quantidade + qtd;
@@ -602,6 +705,9 @@ class VendaController {
       if (!venda) {
         return res.status(404).json({ error: 'Venda não encontrada' });
       }
+      if (String(venda.aprovacao_status || 'aprovado') === 'pendente') {
+        return res.status(400).json({ error: 'Pedido aguardando aprovação' });
+      }
 
       const produto = await ProdutoModel.obterPorId(item.produto_id);
       if (!produto) {
@@ -652,6 +758,33 @@ class VendaController {
       res.json({ message: 'Item atualizado com sucesso', quantidade, subtotal: novoSubtotal });
     } catch (error) {
       console.error('Erro ao atualizar item:', error);
+      res.status(500).json({ error: error.message });
+    }
+  }
+
+  static async atualizarStatusItem(req, res) {
+    try {
+      const { id, item_id } = req.params;
+      const statusItem = String(req.body?.status_item || '').trim().toLowerCase();
+      if (!['anotado', 'saiu'].includes(statusItem)) {
+        return res.status(400).json({ error: 'Status do item inválido' });
+      }
+      const venda = await VendaModel.obterPorId(id);
+      if (!venda) return res.status(404).json({ error: 'Venda não encontrada' });
+      if (String(venda.status) === 'fechada') return res.status(400).json({ error: 'Comanda fechada' });
+      const item = await VendaItemModel.obterPorId(item_id);
+      if (!item || Number(item.venda_id) !== Number(id)) {
+        return res.status(404).json({ error: 'Item não encontrado' });
+      }
+      await VendaItemModel.atualizar(item_id, { status_item: statusItem });
+      await registrarHistorico('item_status_atualizado', parseInt(id, 10), {
+        item_id: parseInt(item_id, 10),
+        status_item: statusItem
+      });
+      broadcast('venda.item', { venda_id: parseInt(id, 10), item_id: parseInt(item_id, 10), acao: 'status', status_item: statusItem });
+      res.json({ message: 'Status do item atualizado', status_item: statusItem });
+    } catch (error) {
+      console.error('Erro ao atualizar status do item:', error);
       res.status(500).json({ error: error.message });
     }
   }
@@ -890,6 +1023,61 @@ class VendaController {
       res.json({ message: 'Status atualizado com sucesso' });
     } catch (error) {
       console.error('Erro ao atualizar status:', error);
+      res.status(500).json({ error: error.message });
+    }
+  }
+
+  static async aprovarAutoatendimento(req, res) {
+    try {
+      const { id } = req.params;
+      const venda = await VendaModel.obterPorId(id);
+      if (!venda) return res.status(404).json({ error: 'Venda não encontrada' });
+      if (String(venda.aprovacao_status || 'aprovado') !== 'pendente') {
+        return res.status(400).json({ error: 'Pedido não está pendente' });
+      }
+      const itens = await VendaItemModel.obterPorVenda(id);
+      for (const item of itens) {
+        const produto = await ProdutoModel.obterPorId(item.produto_id);
+        const consumo = Math.max(1, Number(item.consumo_estoque || 1));
+        const necessario = Number(item.quantidade || 0) * consumo;
+        if (!produto || Number(produto.estoque || 0) < necessario) {
+          return res.status(400).json({ error: `Estoque insuficiente para ${item.produto_nome || 'item'}` });
+        }
+      }
+      for (const item of itens) {
+        const consumo = Math.max(1, Number(item.consumo_estoque || 1));
+        await ProdutoModel.atualizarEstoque(item.produto_id, -(Number(item.quantidade || 0) * consumo));
+      }
+      const vaiCozinha = itens.some((i) => Number(i.produto_vai_cozinha || 0) === 1);
+      await VendaModel.atualizar(id, {
+        aprovacao_status: 'aprovado',
+        status: vaiCozinha ? 'em_preparo' : 'aberta'
+      });
+      await registrarHistorico('autoatendimento_aprovado', parseInt(id, 10), null);
+      broadcast('venda.atualizada', { id: parseInt(id, 10), aprovacao_status: 'aprovado' });
+      res.json({ message: 'Pedido aprovado' });
+    } catch (error) {
+      res.status(500).json({ error: error.message });
+    }
+  }
+
+  static async recusarAutoatendimento(req, res) {
+    try {
+      const { id } = req.params;
+      const venda = await VendaModel.obterPorId(id);
+      if (!venda) return res.status(404).json({ error: 'Venda não encontrada' });
+      if (String(venda.aprovacao_status || 'aprovado') !== 'pendente') {
+        return res.status(400).json({ error: 'Pedido não está pendente' });
+      }
+      await VendaModel.atualizar(id, {
+        aprovacao_status: 'recusado',
+        status: 'fechada',
+        observacoes: String(req.body?.motivo || '').trim() || venda.observacoes || null
+      });
+      await registrarHistorico('autoatendimento_recusado', parseInt(id, 10), { motivo: req.body?.motivo || null });
+      broadcast('venda.atualizada', { id: parseInt(id, 10), aprovacao_status: 'recusado' });
+      res.json({ message: 'Pedido recusado' });
+    } catch (error) {
       res.status(500).json({ error: error.message });
     }
   }

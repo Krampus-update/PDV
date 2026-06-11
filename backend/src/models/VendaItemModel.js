@@ -3,8 +3,8 @@ import { dbRun, dbGet, dbAll } from '../database/database.js';
 class VendaItemModel {
   static async criar(dados) {
     const result = await dbRun(
-      `INSERT INTO venda_itens (venda_id, produto_id, quantidade, preco_unitario, consumo_estoque, subtotal, observacoes) 
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO venda_itens (venda_id, produto_id, quantidade, preco_unitario, consumo_estoque, subtotal, observacoes, status_item) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         dados.venda_id,
         dados.produto_id,
@@ -12,7 +12,8 @@ class VendaItemModel {
         dados.preco_unitario,
         dados.consumo_estoque || 1,
         dados.subtotal,
-        dados.observacoes || null
+        dados.observacoes || null,
+        dados.status_item || 'anotado'
       ]
     );
     return result.lastID;
@@ -38,7 +39,7 @@ class VendaItemModel {
     const values = [];
 
     for (const [key, value] of Object.entries(dados)) {
-      if (['quantidade', 'preco_unitario', 'subtotal', 'observacoes'].includes(key)) {
+      if (['quantidade', 'preco_unitario', 'subtotal', 'observacoes', 'status_item'].includes(key)) {
         fields.push(`${key} = ?`);
         values.push(value);
       }
@@ -72,6 +73,7 @@ class VendaItemModel {
         vi.consumo_estoque,
         vi.subtotal,
         vi.observacoes,
+        vi.status_item,
         p.id as produto_id,
         p.nome as produto_nome,
         p.tipo as produto_tipo,

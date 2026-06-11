@@ -27,11 +27,16 @@ router.post('/:id/itens', VendaController.adicionarItem);
 // Atualizar quantidade de item
 router.put('/:id/itens/:item_id', VendaController.atualizarItem);
 
+// Atualizar status operacional do item
+router.put('/:id/itens/:item_id/status', VendaController.atualizarStatusItem);
+
 // Remover item da venda
 router.delete('/:id/itens/:item_id', VendaController.removerItem);
 
 // Atualizar status da venda
 router.put('/:id/status', VendaController.atualizarStatus);
+router.put('/:id/auto/aprovar', VendaController.aprovarAutoatendimento);
+router.put('/:id/auto/recusar', VendaController.recusarAutoatendimento);
 router.put('/:id/cliente', VendaController.vincularCliente);
 router.put('/:id/reabrir', VendaController.reabrir);
 router.put('/:id/financeiro', VendaController.aplicarFinanceiro);

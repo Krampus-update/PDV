@@ -272,6 +272,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     uiNotify('Comanda fechada', 'success');
     fecharModalFechamento();
+    document.getElementById('mesas')?.classList.remove('comanda-fullscreen');
     document.getElementById('sideMesas').innerHTML = '<p style="color:#999;font-size:12px">Selecione uma comanda à esquerda</p>';
     currentMesa = null;
     vendaAtual = null;
@@ -518,6 +519,35 @@ document.addEventListener('DOMContentLoaded', () => {
     return c.charAt(0).toUpperCase() + c.slice(1);
   }
 
+  function adicionarLinhaProdutoLote(dados = {}) {
+    const list = document.getElementById('loteProdutosRows');
+    if (!list) return;
+    const row = document.createElement('div');
+    row.className = 'bulk-product-row';
+    row.innerHTML = `
+      <input type="text" class="lote-nome" placeholder="Ex: Coca lata" value="${String(dados.nome || '').replace(/"/g, '&quot;')}">
+      <input type="number" step="0.01" min="0" class="lote-preco" placeholder="0,00" value="${dados.preco || ''}">
+      <input type="number" step="1" min="0" class="lote-estoque" placeholder="0" value="${dados.estoque || ''}">
+      <button type="button" class="bulk-product-remove">x</button>
+    `;
+    row.querySelector('.bulk-product-remove')?.addEventListener('click', () => {
+      row.remove();
+      if (!list.querySelector('.bulk-product-row')) adicionarLinhaProdutoLote();
+    });
+    list.appendChild(row);
+  }
+
+  function lerProdutosLoteRows() {
+    const rows = [...document.querySelectorAll('#loteProdutosRows .bulk-product-row')];
+    return rows
+      .map((row) => ({
+        nome: String(row.querySelector('.lote-nome')?.value || '').trim(),
+        preco: Number.parseFloat(String(row.querySelector('.lote-preco')?.value || '0').replace(',', '.')) || 0,
+        estoque: parseInt(row.querySelector('.lote-estoque')?.value || '0', 10) || 0
+      }))
+      .filter((p) => p.nome && p.preco > 0);
+  }
+
   function parseOpcoesProduto(prod) {
     try {
       const arr = JSON.parse(prod?.opcoes_json || '[]');
@@ -633,6 +663,12 @@ document.addEventListener('DOMContentLoaded', () => {
   if (document.getElementById('btnFinalizarVenda')) {
     document.getElementById('btnFinalizarVenda').addEventListener('click', abrirComanda);
   }
+  document.getElementById('btnLinkAutoAtendimento')?.addEventListener('click', async () => {
+    const tenant = API.getTenant ? API.getTenant() : localStorage.getItem('pdv_tenant');
+    if (!tenant) return uiAlert('Restaurante não identificado. Faça login novamente.', 'warning');
+    const url = `${location.origin}/autoatendimento.html?tenant=${encodeURIComponent(tenant)}`;
+    window.open(url, '_blank');
+  });
 
   async function obterComandaAbertaPorMesa(mesaInformada) {
     const chave = normalizarMesa(mesaInformada);
@@ -806,9 +842,23 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  async function atualizarStatusPedidoItem(vendaId, itemId, statusItem) {
+    try {
+      await API.atualizarStatusItem(vendaId, itemId, statusItem);
+      const updated = await API.obterVenda(vendaId);
+      currentMesa = updated;
+      renderSideMesa(updated);
+      await carregarMesas();
+    } catch (e) {
+      console.error('Erro ao atualizar status do item', e);
+      await uiAlert(e.message || 'Erro ao atualizar status do item', 'error');
+    }
+  }
+
   window.removerItemMesa = removerItemMesa;
   window.cancelarPedidoItem = cancelarPedidoItem;
   window.alterarQuantidadeMesa = alterarQuantidadeMesa;
+  window.atualizarStatusPedidoItem = atualizarStatusPedidoItem;
 
   function removerDoCarrinho(idx) {
     carrinho.splice(idx, 1);
@@ -833,9 +883,11 @@ document.addEventListener('DOMContentLoaded', () => {
   async function carregarMesas() {
     try {
       const vendas = await API.obterVendas({ tipo: 'bar' });
+      renderPedidosPendentesAuto(vendas || []);
       const el = document.getElementById('listaMesas');
       if (!el) return;
       const lista = (vendas || []).filter((v) => {
+        if (String(v.aprovacao_status || 'aprovado') === 'pendente') return false;
         const statusOk = filtroComandaStatus === 'todas' ? true : String(v.status || '') === filtroComandaStatus;
         if (!statusOk) return false;
         if (!filtroComandaTermo) return true;
@@ -930,24 +982,59 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const getStatusItem = (item) => {
-      const vaiCozinha = Number(item.produto_vai_cozinha || 0) === 1;
-      if (!vaiCozinha) {
-        return { label: 'Liberado', color: '#607D8B', bg: 'rgba(96,125,139,0.12)' };
-      }
-      if (venda.status === 'pronta') {
-        return { label: 'Pronto', color: '#2E7D32', bg: 'rgba(76,175,80,0.15)' };
-      }
-      if (venda.status === 'em_preparo') {
-        return { label: 'Em preparo', color: '#EF6C00', bg: 'rgba(255,152,0,0.15)' };
-      }
-      if (venda.status === 'fechada') {
-        return { label: 'Fechado', color: '#475569', bg: 'rgba(148,163,184,0.14)' };
-      }
-      return { label: 'Aguardando', color: '#1565C0', bg: 'rgba(33,150,243,0.15)' };
+      const statusItem = String(item.status_item || 'anotado').toLowerCase() === 'saiu' ? 'saiu' : 'anotado';
+      if (statusItem === 'saiu') return { key: 'saiu', label: 'Saiu', color: '#16a34a', bg: '#f0fdf4' };
+      return { key: 'anotado', label: 'Anotado', color: '#f59e0b', bg: '#fff7ed' };
     };
 
+    const renderItemMesa = (i) => {
+      const st = getStatusItem(i);
+      const proximoStatus = st.key === 'anotado' ? 'saiu' : 'anotado';
+      const rotuloBotao = st.key === 'anotado' ? 'Marcar saiu' : 'Voltar anotado';
+      return `<div class="mesa-item-card ${st.key}">
+        <div class="mesa-item-main">
+          <strong>${i.produto_nome}</strong>
+          ${i.observacoes ? `<small>${i.observacoes}</small>` : ''}
+          <small>x${i.quantidade} • ${formatarMoedaBR(i.preco_unitario || 0)} un • ${formatarMoedaBR(i.subtotal || 0)}</small>
+          <span style="display:inline-block;margin-top:6px;padding:2px 7px;border-radius:999px;font-size:10px;font-weight:700;color:${st.color};background:#fff">${st.label}</span>
+        </div>
+        <div class="mesa-item-actions">
+          <button class="btn btn-small btn-secondary" onclick="alterarQuantidadeMesa(${venda.id},${i.id},-1)" ${comandaFechada ? 'disabled' : ''}>-</button>
+          <span style="min-width:22px;text-align:center;font-size:12px;font-weight:700">${i.quantidade}</span>
+          <button class="btn btn-small btn-secondary" onclick="alterarQuantidadeMesa(${venda.id},${i.id},1)" ${comandaFechada ? 'disabled' : ''}>+</button>
+          <button class="btn btn-small btn-primary" onclick="atualizarStatusPedidoItem(${venda.id},${i.id},'${proximoStatus}')" ${comandaFechada ? 'disabled' : ''}>${rotuloBotao}</button>
+          <button class="btn btn-small btn-danger" onclick="cancelarPedidoItem(${venda.id},${i.id})" ${comandaFechada ? 'disabled' : ''}>Cancelar</button>
+        </div>
+      </div>`;
+    };
+    const itensJaSaiu = itens.filter((i) => String(i.status_item || 'anotado').toLowerCase() === 'saiu');
+    const itensAnotados = itens.filter((i) => String(i.status_item || 'anotado').toLowerCase() !== 'saiu');
+    const itensHtml = itens.length === 0
+      ? '<p style="color:#666;margin:0">Sem itens</p>'
+      : `${itensAnotados.length ? `<div class="mesa-grupo-titulo">Pedido anotado</div>${itensAnotados.map(renderItemMesa).join('')}` : ''}
+         ${itensJaSaiu.length ? `<div class="mesa-grupo-titulo">Pedido que já saiu</div>${itensJaSaiu.map(renderItemMesa).join('')}` : ''}`;
+
+    const addControlsHtml = `
+      <div style="display:flex;gap:6px;margin-bottom:8px">
+        <button class="btn btn-small btn-modo-produtos" style="flex:1;padding:8px;font-size:11px">Produtos</button>
+        <button class="btn btn-small btn-secondary btn-modo-avulso" style="flex:1;padding:8px;font-size:11px">Valor Avulso</button>
+      </div>
+      <div class="bloco-produtos" style="display:block">
+        <h4 style="margin:8px 0 4px;font-size:12px">Adicionar Produto</h4>
+        ${comandaFechada ? '<p style="font-size:12px;color:#64748b">Comanda fechada. Reabra para adicionar itens.</p>' : prodGrid}
+      </div>
+      <div class="bloco-avulso" style="display:none">
+        <h4 style="margin:8px 0 4px;font-size:12px">Valor Avulso</h4>
+        <div class="side-mesa-display display-value" style="font-size:18px;margin-bottom:8px">R$ 0,00</div>
+        <div class="side-mesa-teclado numeric-pad" style="grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px"></div>
+        <div style="display:flex;gap:4px;flex-direction:column;margin-bottom:12px">
+          <button class="pad-key secondary btn-side-mesa-clear" style="padding:8px;font-size:11px" ${comandaFechada ? 'disabled' : ''}>Limpar</button>
+          <button class="pad-key btn-side-mesa-add-valor" style="padding:8px;font-size:11px" ${comandaFechada ? 'disabled' : ''}>Adicionar Valor</button>
+        </div>
+      </div>`;
+
     sideEl.innerHTML = `
-      <div class="sidebar-section">
+      <div class="sidebar-section comanda-compacta">
         <h3>Comanda ${tituloComanda(venda)}</h3>
         <div style="font-size:12px;margin-bottom:8px">Total: <strong style="color:var(--success)">${formatarMoedaBR(venda.total || 0)}</strong></div>
         <div style="font-size:12px;margin-bottom:8px">Cliente: <strong>${venda.cliente_nome || 'Não vinculado'}</strong></div>
@@ -955,83 +1042,73 @@ document.addEventListener('DOMContentLoaded', () => {
           <button id="btnVincularClienteMesa" class="btn btn-small btn-secondary" style="flex:1;padding:6px;font-size:11px" ${comandaFechada ? 'disabled' : ''}>Vincular cliente</button>
           <button id="btnReabrirVendaMesa" class="btn btn-small" style="flex:1;padding:6px;font-size:11px">Reabrir venda</button>
         </div>
+        <div style="display:flex;gap:6px;margin-bottom:8px">
+          <button id="btnTelaCheiaComanda" class="btn btn-small btn-secondary" style="flex:1;padding:6px;font-size:11px">Tela inteira</button>
+          <button id="btnImprimirComanda" class="btn btn-small btn-secondary" style="flex:1;padding:6px;font-size:11px">Imprimir</button>
+          <button id="btnWhatsappComanda" class="btn btn-small btn-secondary" style="flex:1;padding:6px;font-size:11px">WhatsApp</button>
+        </div>
         <h4 style="margin:8px 0 4px;font-size:12px">Itens</h4>
         <div class="mesa-items-list">
-          ${
-            itens.length === 0
-              ? '<p style="color:#666;margin:0">Sem itens</p>'
-              : itens
-                  .map((i) => {
-                    const st = getStatusItem(i);
-                    return `<div class="mesa-item" style="display:flex;justify-content:space-between;align-items:center;padding:6px;border-bottom:1px solid #eee;font-size:12px;border-left:4px solid ${st.color};background:${st.bg}">
-                      <div style="flex:1">
-                        <div>${i.produto_nome}</div>
-                        ${i.observacoes ? `<div style="font-size:10px;color:#555">${i.observacoes}</div>` : ''}
-                        <div style="font-size:10px;color:#999">x${i.quantidade}</div>
-                        <div style="display:inline-block;margin-top:2px;padding:1px 6px;border-radius:10px;font-size:10px;color:${st.color};background:#fff">${st.label}</div>
-                      </div>
-                      <div style="display:flex;gap:4px;align-items:center">
-                        <button onclick="alterarQuantidadeMesa(${venda.id},${i.id},-1)" ${comandaFechada ? 'disabled' : ''} style="padding:2px 4px;font-size:10px;border:1px solid #ccc;background:#fff;cursor:pointer;border-radius:2px">-</button>
-                        <span style="min-width:18px;text-align:center;font-size:10px">${i.quantidade}</span>
-                        <button onclick="alterarQuantidadeMesa(${venda.id},${i.id},1)" ${comandaFechada ? 'disabled' : ''} style="padding:2px 4px;font-size:10px;border:1px solid #ccc;background:#fff;cursor:pointer;border-radius:2px">+</button>
-                        <button onclick="cancelarPedidoItem(${venda.id},${i.id})" ${comandaFechada ? 'disabled' : ''} style="padding:2px 6px;font-size:10px;background:var(--danger);color:white;border:none;cursor:pointer;border-radius:2px">Cancelar</button>
-                      </div>
-                      <span style="color:var(--success);font-weight:bold;min-width:50px;text-align:right">${formatarMoedaBR(i.subtotal)}</span>
-                    </div>`;
-                  })
-                  .join('')
-          }
+          ${itensHtml}
         </div>
         <hr style="margin:12px 0;border:none;border-top:1px solid #eee" />
-        <div style="display:flex;gap:6px;margin-bottom:8px">
-          <button id="btnModoProdutos" class="btn btn-small" style="flex:1;padding:8px;font-size:11px">Produtos</button>
-          <button id="btnModoAvulso" class="btn btn-small btn-secondary" style="flex:1;padding:8px;font-size:11px">Valor Avulso</button>
-        </div>
-        <div id="blocoProdutos" style="display:block">
-          <h4 style="margin:8px 0 4px;font-size:12px">Adicionar Produto</h4>
-          ${comandaFechada ? '<p style="font-size:12px;color:#64748b">Comanda fechada. Reabra para adicionar itens.</p>' : prodGrid}
-        </div>
-        <div id="blocoAvulso" style="display:none">
-          <h4 style="margin:8px 0 4px;font-size:12px">Valor Avulso</h4>
-          <div id="sideMesaDisplay" class="display-value" style="font-size:18px;margin-bottom:8px">R$ 0,00</div>
-          <div id="sideMesaTeclado" class="numeric-pad" style="grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px"></div>
-          <div style="display:flex;gap:4px;flex-direction:column;margin-bottom:12px">
-            <button id="btnSideMesaClear" class="pad-key secondary" style="padding:8px;font-size:11px" ${comandaFechada ? 'disabled' : ''}>Limpar</button>
-            <button id="btnSideMesaAddValor" class="pad-key" style="padding:8px;font-size:11px" ${comandaFechada ? 'disabled' : ''}>Adicionar Valor</button>
+        ${addControlsHtml}
+        <button id="btnSideMesaFechar" class="btn btn-success btn-block" style="font-size:12px;padding:10px" ${comandaFechada ? 'disabled' : ''}>Tela de Fechamento</button>
+      </div>
+      <div class="comanda-full">
+        <div class="comanda-full-top">
+          <div class="comanda-full-title">
+            <h3>${tituloComanda(venda)}</h3>
+            <div class="comanda-full-meta">
+              <span>Total: <strong>${formatarMoedaBR(venda.total || 0)}</strong></span>
+              <span>Cliente: <strong>${venda.cliente_nome || 'Não vinculado'}</strong></span>
+              <span>Status: <strong>${String(venda.status || 'aberta')}</strong></span>
+              <span>${itens.length} item(ns)</span>
+            </div>
+          </div>
+          <div class="comanda-full-actions">
+            <button class="btn btn-small btn-secondary btn-vincular-cliente-mesa" ${comandaFechada ? 'disabled' : ''}>Vincular cliente</button>
+            <button class="btn btn-small btn-secondary btn-imprimir-comanda">Imprimir</button>
+            <button class="btn btn-small btn-secondary btn-whatsapp-comanda">WhatsApp</button>
+            <button class="btn btn-small btn-success btn-side-mesa-fechar" ${comandaFechada ? 'disabled' : ''}>Fechamento</button>
+            <button class="btn btn-small btn-secondary btn-tela-cheia-comanda">Sair da tela cheia</button>
           </div>
         </div>
-        <button id="btnSideMesaFechar" class="btn btn-success btn-block" style="font-size:12px;padding:10px" ${comandaFechada ? 'disabled' : ''}>Tela de Fechamento</button>
+        <div class="comanda-full-body">
+          <div class="comanda-full-items">
+            <h4>Itens da comanda</h4>
+            <div class="mesa-items-list">${itensHtml}</div>
+          </div>
+          <div class="comanda-full-add">
+            <h4>Adicionar na comanda</h4>
+            ${addControlsHtml}
+          </div>
+        </div>
       </div>
     `;
 
-    const blocoProdutos = document.getElementById('blocoProdutos');
-    const blocoAvulso = document.getElementById('blocoAvulso');
-    const btnModoProdutos = document.getElementById('btnModoProdutos');
-    const btnModoAvulso = document.getElementById('btnModoAvulso');
+    sideEl.querySelectorAll('.comanda-compacta, .comanda-full-add').forEach((panel) => {
+      const blocoProdutos = panel.querySelector('.bloco-produtos');
+      const blocoAvulso = panel.querySelector('.bloco-avulso');
+      const btnModoProdutos = panel.querySelector('.btn-modo-produtos');
+      const btnModoAvulso = panel.querySelector('.btn-modo-avulso');
+      const tecladoLocal = criarTeclado(panel.querySelector('.side-mesa-teclado'), panel.querySelector('.side-mesa-display'));
 
-    function aplicarModo(modo) {
-      const produtosAtivo = modo === 'produtos';
-      if (blocoProdutos) blocoProdutos.style.display = produtosAtivo ? 'block' : 'none';
-      if (blocoAvulso) blocoAvulso.style.display = produtosAtivo ? 'none' : 'block';
-      if (btnModoProdutos) btnModoProdutos.className = produtosAtivo ? 'btn btn-small' : 'btn btn-small btn-secondary';
-      if (btnModoAvulso) btnModoAvulso.className = produtosAtivo ? 'btn btn-small btn-secondary' : 'btn btn-small';
-    }
+      function aplicarModo(modo) {
+        const produtosAtivo = modo === 'produtos';
+        if (blocoProdutos) blocoProdutos.style.display = produtosAtivo ? 'block' : 'none';
+        if (blocoAvulso) blocoAvulso.style.display = produtosAtivo ? 'none' : 'block';
+        if (btnModoProdutos) btnModoProdutos.className = produtosAtivo ? 'btn btn-small btn-modo-produtos' : 'btn btn-small btn-secondary btn-modo-produtos';
+        if (btnModoAvulso) btnModoAvulso.className = produtosAtivo ? 'btn btn-small btn-secondary btn-modo-avulso' : 'btn btn-small btn-modo-avulso';
+      }
 
-    if (btnModoProdutos) btnModoProdutos.addEventListener('click', () => aplicarModo('produtos'));
-    if (btnModoAvulso) btnModoAvulso.addEventListener('click', () => aplicarModo('avulso'));
-    aplicarModo('produtos');
+      btnModoProdutos?.addEventListener('click', () => aplicarModo('produtos'));
+      btnModoAvulso?.addEventListener('click', () => aplicarModo('avulso'));
+      aplicarModo('produtos');
 
-    if (mesaTeclado && mesaTeclado.container) mesaTeclado.container.innerHTML = '';
-    mesaTeclado = criarTeclado(document.getElementById('sideMesaTeclado'), document.getElementById('sideMesaDisplay'));
-    if (mesaTeclado) mesaTeclado.container = document.getElementById('sideMesaTeclado');
-
-    const btnSideClear = document.getElementById('btnSideMesaClear');
-    if (btnSideClear) btnSideClear.addEventListener('click', () => mesaTeclado && mesaTeclado.clear());
-
-    const btnSideAdd = document.getElementById('btnSideMesaAddValor');
-    if (btnSideAdd) {
-      btnSideAdd.addEventListener('click', async () => {
-        const valor = mesaTeclado && mesaTeclado.getValue();
+      panel.querySelector('.btn-side-mesa-clear')?.addEventListener('click', () => tecladoLocal && tecladoLocal.clear());
+      panel.querySelector('.btn-side-mesa-add-valor')?.addEventListener('click', async () => {
+        const valor = tecladoLocal && tecladoLocal.getValue();
         if (valor === null || valor <= 0) return uiAlert('Valor inválido', 'warning');
         if (!currentMesa) return uiAlert('Nenhuma comanda selecionada', 'warning');
         try {
@@ -1048,7 +1125,7 @@ document.addEventListener('DOMContentLoaded', () => {
           const upd = await API.obterVenda(currentMesa.id);
           currentMesa = upd;
           renderSideMesa(upd);
-          if (mesaTeclado) mesaTeclado.clear();
+          if (tecladoLocal) tecladoLocal.clear();
           try {
             await API.deletarProduto(pid);
           } catch (e) {
@@ -1066,7 +1143,7 @@ document.addEventListener('DOMContentLoaded', () => {
           await uiAlert('Erro ao adicionar valor', 'error');
         }
       });
-    }
+    });
 
     sideEl.querySelectorAll('.produto-mesa-card').forEach((card) => {
       card.addEventListener('click', async () => {
@@ -1101,16 +1178,39 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     });
 
-    const btnFechar = document.getElementById('btnSideMesaFechar');
-    if (btnFechar) {
+    sideEl.querySelectorAll('#btnTelaCheiaComanda, .btn-tela-cheia-comanda').forEach((btn) => btn.addEventListener('click', () => {
+      document.getElementById('mesas')?.classList.toggle('comanda-fullscreen');
+      renderSideMesa(venda);
+    }));
+
+    sideEl.querySelectorAll('#btnImprimirComanda, .btn-imprimir-comanda').forEach((btn) => btn.addEventListener('click', async () => {
+      try {
+        await API.imprimirVenda(venda.id, 'balcao');
+        uiNotify('Comanda enviada para impressão', 'success');
+      } catch (e) {
+        await uiAlert(e.message || 'Erro ao imprimir comanda', 'error');
+      }
+    }));
+
+    sideEl.querySelectorAll('#btnWhatsappComanda, .btn-whatsapp-comanda').forEach((btn) => btn.addEventListener('click', async () => {
+      const telefone = String(venda.cliente_telefone || '').replace(/\D/g, '');
+      if (!telefone) return uiAlert('Vincule um cliente com telefone para abrir o WhatsApp.', 'warning');
+      const linhas = [
+        `Comanda ${tituloComanda(venda)}`,
+        ...itens.map((i) => `${i.quantidade}x ${i.produto_nome}${i.observacoes ? ` (${i.observacoes})` : ''} - ${formatarMoedaBR(i.subtotal)}`),
+        `Total: ${formatarMoedaBR(venda.total || 0)}`
+      ];
+      window.open(`https://wa.me/55${telefone}?text=${encodeURIComponent(linhas.join('\n'))}`, '_blank');
+    }));
+
+    sideEl.querySelectorAll('#btnSideMesaFechar, .btn-side-mesa-fechar').forEach((btnFechar) => {
       btnFechar.addEventListener('click', async () => {
         if (!currentMesa) return;
         abrirModalFechamento();
       });
-    }
+    });
 
-    const btnVincularClienteMesa = document.getElementById('btnVincularClienteMesa');
-    if (btnVincularClienteMesa) {
+    sideEl.querySelectorAll('#btnVincularClienteMesa, .btn-vincular-cliente-mesa').forEach((btnVincularClienteMesa) => {
       btnVincularClienteMesa.addEventListener('click', async () => {
         if (!currentMesa) return;
         const clientes = await API.obterClientes('');
@@ -1140,7 +1240,7 @@ document.addEventListener('DOMContentLoaded', () => {
         await carregarMesas();
         uiNotify(clienteId ? 'Cliente vinculado à comanda' : 'Vínculo removido', 'success');
       });
-    }
+    });
 
     const btnReabrirVendaMesa = document.getElementById('btnReabrirVendaMesa');
     if (btnReabrirVendaMesa) {
@@ -1234,16 +1334,41 @@ document.addEventListener('DOMContentLoaded', () => {
       el.innerHTML = '<p style="font-size:12px;color:#64748b">Nenhum produto encontrado.</p>';
       return;
     }
-    el.innerHTML = filtered
-      .map(
-        (p) =>
-          `<div class="product-list-item" data-id="${p.id}"><div><div class="product-list-item-name">#${p.id} ${p.nome} ${Number(p.destaque || 0) === 1 ? '<span style="color:#f59e0b">★</span>' : ''}</div><div style="font-size:11px;color:#999">${rotuloCategoria(p.categoria)} • pop ${Number(p.popularidade || 0)} • ${p.tipo}${Number(p.vai_cozinha || 0) === 1 ? ' • cozinha' : ''}</div></div><div class="product-list-item-info"><span class="qty">${p.estoque} un</span><span class="price">${formatarMoedaBR(p.preco)}</span><button onclick="deletarProduto(${p.id})" class="delete-btn">X</button></div></div>`
-      )
+    const grouped = filtered.reduce((acc, p) => {
+      const cat = normalizarCategoria(p.categoria);
+      if (!acc[cat]) acc[cat] = [];
+      acc[cat].push(p);
+      return acc;
+    }, {});
+    const renderProdutoEstoque = (p) =>
+      `<div class="product-list-item" data-id="${p.id}"><div><div class="product-list-item-name">#${p.id} ${p.nome} ${Number(p.destaque || 0) === 1 ? '<span style="color:#f59e0b">★</span>' : ''}</div><div style="font-size:11px;color:#999">pop ${Number(p.popularidade || 0)} • ${p.tipo}${Number(p.vai_cozinha || 0) === 1 ? ' • cozinha' : ''}</div></div><div class="product-list-item-info"><span class="qty">${p.estoque} un</span><span class="price">${formatarMoedaBR(p.preco)}</span><button onclick="deletarProduto(${p.id})" class="delete-btn">X</button></div></div>`;
+
+    el.innerHTML = Object.keys(grouped)
+      .sort((a, b) => a.localeCompare(b, 'pt-BR'))
+      .map((cat) => {
+        const itensCategoria = grouped[cat].sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR'));
+        return `<section class="stock-category-section">
+          <div class="stock-category-header">
+            <div class="stock-category-title">
+              <strong>${rotuloCategoria(cat)}</strong>
+              <span>${itensCategoria.length} produto(s)</span>
+            </div>
+            <button class="btn btn-secondary btn-soft btn-renomear-categoria" type="button" data-categoria="${cat}">Renomear</button>
+          </div>
+          <div class="stock-category-items">${itensCategoria.map(renderProdutoEstoque).join('')}</div>
+        </section>`;
+      })
       .join('');
     el.querySelectorAll('.product-list-item').forEach((item) => {
       item.addEventListener('click', () => {
         const id = item.dataset.id;
         selecionarProduto(id);
+      });
+    });
+    el.querySelectorAll('.btn-renomear-categoria').forEach((btn) => {
+      btn.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        renomearCategoriaEstoque(btn.dataset.categoria || '');
       });
     });
     if (window.produtoSelecionado) {
@@ -1398,6 +1523,98 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  document.getElementById('btnCriarProdutosLote')?.addEventListener('click', async () => {
+    const categoria = normalizarCategoria(document.getElementById('loteCategoria')?.value || document.getElementById('novoProdutoCategoria')?.value || 'geral');
+    const itens = lerProdutosLoteRows();
+    if (!itens.length) return uiAlert('Informe ao menos um produto com nome e preço.', 'warning');
+    try {
+      const resp = await API.criarProdutosLote(categoria, itens);
+      const rows = document.getElementById('loteProdutosRows');
+      if (rows) rows.innerHTML = '';
+      adicionarLinhaProdutoLote();
+      document.getElementById('loteCategoria').value = categoria;
+      await carregarProdutosCompleto();
+      const criados = resp.criados?.length || 0;
+      const ignorados = resp.ignorados?.length || 0;
+      uiNotify(`${criados} produto(s) criado(s)${ignorados ? `, ${ignorados} ignorado(s) por nome repetido` : ''}`, criados ? 'success' : 'warning');
+    } catch (e) {
+      await uiAlert(e.message || 'Erro ao criar produtos em lote', 'error');
+    }
+  });
+  document.getElementById('btnAddProdutoLote')?.addEventListener('click', () => adicionarLinhaProdutoLote());
+  adicionarLinhaProdutoLote();
+
+  async function renomearCategoriaEstoque(categoriaAtual) {
+    const atual = normalizarCategoria(categoriaAtual);
+    const entrada = ui.prompt
+      ? await ui.prompt({
+          title: 'Renomear categoria',
+          message: `Novo nome para "${rotuloCategoria(atual)}".`,
+          placeholder: 'Novo nome',
+          value: atual,
+          okLabel: 'Renomear'
+        })
+      : prompt(`Novo nome para "${rotuloCategoria(atual)}":`, atual);
+    if (entrada === null) return;
+    const nova = normalizarCategoria(entrada);
+    if (!nova || nova === atual) return uiAlert('Informe um novo nome de categoria', 'warning');
+    if (!(await uiConfirm(`Renomear todos os itens de "${atual}" para "${nova}"?`, { title: 'Renomear categoria' }))) return;
+    try {
+      const resp = await API.renomearCategoria(atual, nova);
+      await carregarProdutosCompleto();
+      uiNotify(`${resp.alterados || 0} item(ns) atualizados`, 'success');
+    } catch (e) {
+      await uiAlert(e.message || 'Erro ao renomear categoria', 'error');
+    }
+  }
+
+  function renderPedidosPendentesAuto(vendas) {
+    const el = document.getElementById('autoPedidosPendentes');
+    if (!el) return;
+    const pendentes = (vendas || []).filter((v) => String(v.aprovacao_status || '') === 'pendente');
+    if (!pendentes.length) {
+      el.innerHTML = '';
+      return;
+    }
+    el.innerHTML = `<section style="border:1px solid #f59e0b;border-radius:8px;background:#fffbeb;padding:10px">
+      <h3 style="margin:0 0 8px;font-size:15px;color:#92400e">Pedidos aguardando aprovação</h3>
+      <div style="display:flex;flex-direction:column;gap:6px">
+        ${pendentes.map((v) => `<div style="display:flex;justify-content:space-between;gap:8px;align-items:center;background:#fff;border:1px solid #fde68a;border-radius:8px;padding:8px">
+          <div>
+            <strong>${v.auto_cliente_nome || 'Cliente'} • ${tituloComanda(v)}</strong>
+            <div style="font-size:12px;color:#64748b">${formatarMoedaBR(v.total || 0)} • ${new Date(v.created_at).toLocaleString('pt-BR')}</div>
+          </div>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-small btn-primary btn-auto-ver" data-id="${v.id}">Ver</button>
+            <button class="btn btn-small btn-success btn-auto-aprovar" data-id="${v.id}">Aprovar</button>
+            <button class="btn btn-small btn-danger btn-auto-recusar" data-id="${v.id}">Recusar</button>
+          </div>
+        </div>`).join('')}
+      </div>
+    </section>`;
+    el.querySelectorAll('.btn-auto-ver').forEach((btn) => btn.addEventListener('click', () => abrirMesa(btn.dataset.id)));
+    el.querySelectorAll('.btn-auto-aprovar').forEach((btn) => btn.addEventListener('click', async () => {
+      try {
+        await API.aprovarAutoatendimento(btn.dataset.id);
+        uiNotify('Pedido aprovado', 'success');
+        await carregarMesas();
+        await carregarProdutosCompleto();
+      } catch (e) {
+        await uiAlert(e.message || 'Erro ao aprovar pedido', 'error');
+      }
+    }));
+    el.querySelectorAll('.btn-auto-recusar').forEach((btn) => btn.addEventListener('click', async () => {
+      if (!(await uiConfirm('Recusar este pedido?', { title: 'Autoatendimento' }))) return;
+      try {
+        await API.recusarAutoatendimento(btn.dataset.id, '');
+        uiNotify('Pedido recusado', 'success');
+        await carregarMesas();
+      } catch (e) {
+        await uiAlert(e.message || 'Erro ao recusar pedido', 'error');
+      }
+    }));
+  }
+
   function limparFormularioProduto() {
     window.produtoSelecionado = null;
     const nomeEl = document.getElementById('novoProdutoNome');
@@ -1505,6 +1722,37 @@ document.addEventListener('DOMContentLoaded', () => {
     if (atual && el.querySelector(`option[value="${atual}"]`)) {
       el.value = atual;
     }
+    const bonusEl = document.getElementById('promoProdutoBonusId');
+    if (bonusEl) {
+      const atualBonus = bonusEl.value;
+      bonusEl.innerHTML = lista.length
+        ? lista.map((p) => `<option value="${p.id}">${p.nome} (${formatarMoedaBR(p.preco)})</option>`).join('')
+        : '<option value="">Sem produtos cadastrados</option>';
+      if (atualBonus && bonusEl.querySelector(`option[value="${atualBonus}"]`)) bonusEl.value = atualBonus;
+    }
+    atualizarSelectVariacoesPromocao();
+  }
+
+  function atualizarCamposTipoPromocao() {
+    const tipo = document.getElementById('promoTipo')?.value || 'combo_produto';
+    const bonusBox = document.getElementById('promoBonusBox');
+    const precoCombo = document.getElementById('promoPrecoCombo');
+    if (bonusBox) bonusBox.style.display = tipo === 'ganhe_produto' ? 'block' : 'none';
+    if (precoCombo) precoCombo.disabled = tipo === 'ganhe_produto';
+  }
+
+  function atualizarSelectVariacoesPromocao(valorAtual = null) {
+    const produtoEl = document.getElementById('promoProdutoId');
+    const variacaoEl = document.getElementById('promoVariacaoNome');
+    if (!produtoEl || !variacaoEl) return;
+    const produto = (produtosCache || []).find((p) => String(p.id) === String(produtoEl.value));
+    const opcoes = parseOpcoesProduto(produto);
+    const atual = valorAtual !== null ? valorAtual : variacaoEl.value;
+    variacaoEl.innerHTML = '<option value="">Todas as variações do produto</option>' +
+      opcoes.map((o) => `<option value="${String(o.nome).replace(/"/g, '&quot;')}">${o.nome}</option>`).join('');
+    if (atual && Array.from(variacaoEl.options).some((opt) => opt.value === String(atual))) {
+      variacaoEl.value = String(atual);
+    }
   }
 
   function limparFormularioPromocao() {
@@ -1512,6 +1760,8 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('promoNome').value = '';
     document.getElementById('promoDescricao').value = '';
     document.getElementById('promoTipo').value = 'combo_produto';
+    atualizarSelectVariacoesPromocao('');
+    atualizarCamposTipoPromocao();
     document.getElementById('promoQuantidadeMin').value = '3';
     document.getElementById('promoPrecoCombo').value = '15';
     document.getElementById('promoRepetirNaVenda').checked = true;
@@ -1533,7 +1783,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const tag = Number(p.ativo || 0) === 1 ? '<span style="color:#16a34a">Ativa</span>' : '<span style="color:#64748b">Inativa</span>';
         const regra =
           String(p.tipo || '') === 'combo_produto'
-            ? `${Number(p.quantidade_min || 0)}x ${p.produto_nome || `#${p.produto_id}`} por ${formatarMoedaBR(p.preco_combo || 0)}`
+            ? `${Number(p.quantidade_min || 0)}x ${p.produto_nome || `#${p.produto_id}`}${p.variacao_nome ? ` (${p.variacao_nome})` : ''} por ${formatarMoedaBR(p.preco_combo || 0)}`
+            : String(p.tipo || '') === 'ganhe_produto'
+              ? `${Number(p.quantidade_min || 0)}x ${p.produto_nome || `#${p.produto_id}`}${p.variacao_nome ? ` (${p.variacao_nome})` : ''} ganha ${Number(p.produto_bonus_quantidade || 1)}x ${p.produto_bonus_nome || `#${p.produto_bonus_id}`}`
             : 'Regra personalizada';
         const repeticaoTxt = Number(p.repetir_na_venda ?? 1) === 1 ? 'Acumula na venda' : '1x por venda';
         return `<div class="product-list-item ${Number(promocaoEmEdicaoId) === Number(p.id) ? 'selected' : ''}" data-id="${p.id}">
@@ -1570,28 +1822,37 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   const btnSalvarPromocao = document.getElementById('btnSalvarPromocao');
+  document.getElementById('promoProdutoId')?.addEventListener('change', () => atualizarSelectVariacoesPromocao(''));
+  document.getElementById('promoTipo')?.addEventListener('change', atualizarCamposTipoPromocao);
   if (btnSalvarPromocao) {
     btnSalvarPromocao.addEventListener('click', async () => {
       const nome = String(document.getElementById('promoNome')?.value || '').trim();
       const descricao = String(document.getElementById('promoDescricao')?.value || '').trim();
       const tipo = String(document.getElementById('promoTipo')?.value || 'combo_produto');
       const produtoId = Number(document.getElementById('promoProdutoId')?.value || 0) || null;
+      const variacaoNome = String(document.getElementById('promoVariacaoNome')?.value || '').trim();
+      const produtoBonusId = Number(document.getElementById('promoProdutoBonusId')?.value || 0) || null;
+      const produtoBonusQtd = Math.max(1, Number(document.getElementById('promoProdutoBonusQtd')?.value || 1));
       const quantidadeMin = Math.max(1, Number(document.getElementById('promoQuantidadeMin')?.value || 1));
       const precoCombo = Number.parseFloat(String(document.getElementById('promoPrecoCombo')?.value || '0').replace(',', '.')) || 0;
       const repetirNaVenda = !!document.getElementById('promoRepetirNaVenda')?.checked;
       const ativa = !!document.getElementById('promoAtiva')?.checked;
       if (!nome) return uiAlert('Informe o nome da promoção', 'warning');
       if (!produtoId) return uiAlert('Selecione um produto', 'warning');
-      if (precoCombo <= 0) return uiAlert('Preço do combo deve ser maior que zero', 'warning');
+      if (tipo === 'combo_produto' && precoCombo <= 0) return uiAlert('Preço do combo deve ser maior que zero', 'warning');
+      if (tipo === 'ganhe_produto' && !produtoBonusId) return uiAlert('Selecione o produto bônus', 'warning');
       try {
         const payload = {
           nome,
           descricao: descricao || null,
           tipo,
           produto_id: produtoId,
+          variacao_nome: variacaoNome || null,
+          produto_bonus_id: tipo === 'ganhe_produto' ? produtoBonusId : null,
+          produto_bonus_quantidade: tipo === 'ganhe_produto' ? produtoBonusQtd : 1,
           quantidade_min: quantidadeMin,
           repetir_na_venda: repetirNaVenda,
-          preco_combo: precoCombo,
+          preco_combo: tipo === 'combo_produto' ? precoCombo : null,
           ativo: ativa
         };
         if (promocaoEmEdicaoId) {
@@ -1617,6 +1878,10 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('promoDescricao').value = promo.descricao || '';
     document.getElementById('promoTipo').value = promo.tipo || 'combo_produto';
     document.getElementById('promoProdutoId').value = String(promo.produto_id || '');
+    atualizarSelectVariacoesPromocao(promo.variacao_nome || '');
+    if (document.getElementById('promoProdutoBonusId')) document.getElementById('promoProdutoBonusId').value = String(promo.produto_bonus_id || '');
+    if (document.getElementById('promoProdutoBonusQtd')) document.getElementById('promoProdutoBonusQtd').value = String(Number(promo.produto_bonus_quantidade || 1));
+    atualizarCamposTipoPromocao();
     document.getElementById('promoQuantidadeMin').value = String(Number(promo.quantidade_min || 1));
     document.getElementById('promoPrecoCombo').value = String(Number(promo.preco_combo || 0));
     document.getElementById('promoRepetirNaVenda').checked = Number(promo.repetir_na_venda ?? 1) === 1;

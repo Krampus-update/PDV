@@ -173,6 +173,384 @@
     }
 
     .mesa-item:last-child { border-bottom: none; }
+
+    .bulk-products {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .bulk-products-head,
+    .bulk-product-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1.4fr) 82px 70px 34px;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .bulk-products-head {
+      color: #64748b;
+      font-size: 10px;
+      font-weight: 800;
+      text-transform: uppercase;
+      padding: 0 2px;
+    }
+
+    .bulk-product-row input {
+      height: 34px;
+      font-size: 12px;
+      padding: 6px 8px;
+    }
+
+    .bulk-product-remove {
+      width: 34px;
+      height: 34px;
+      border: none;
+      border-radius: 6px;
+      background: #fee2e2;
+      color: #b91c1c;
+      cursor: pointer;
+      font-weight: 800;
+    }
+
+    .stock-category-section {
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      background: #fff;
+      margin-bottom: 10px;
+      overflow: hidden;
+    }
+
+    .stock-category-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      padding: 9px 10px;
+      background: #f8fafc;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    .stock-category-title {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .stock-category-title strong {
+      color: #0f172a;
+      font-size: 13px;
+    }
+
+    .stock-category-title span {
+      color: #64748b;
+      font-size: 11px;
+      white-space: nowrap;
+    }
+
+    .stock-category-items {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding: 8px;
+    }
+
+    #mesas.comanda-fullscreen .two-column-layout {
+      grid-template-columns: 1fr;
+    }
+
+    #mesas.comanda-fullscreen .main-content {
+      display: none;
+    }
+
+    #mesas.comanda-fullscreen #sideMesas {
+      height: calc(100vh - 100px);
+      position: static;
+      padding: 0;
+      overflow: hidden;
+    }
+
+    #mesas.comanda-fullscreen .comanda-compacta {
+      display: none;
+    }
+
+    #mesas:not(.comanda-fullscreen) .comanda-full {
+      display: none;
+    }
+
+    .comanda-full {
+      height: 100%;
+      display: grid;
+      grid-template-rows: auto minmax(0, 1fr);
+      background: #fff;
+    }
+
+    .comanda-full-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      padding: 12px;
+      border-bottom: 1px solid #e2e8f0;
+      background: #f8fafc;
+    }
+
+    .comanda-full-title h3 {
+      margin: 0 0 4px;
+      font-size: 18px;
+      color: #0f172a;
+    }
+
+    .comanda-full-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      font-size: 12px;
+      color: #475569;
+    }
+
+    .comanda-full-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      justify-content: flex-end;
+    }
+
+    .comanda-full-body {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: minmax(420px, 1.15fr) minmax(360px, 0.85fr);
+      gap: 12px;
+      padding: 12px;
+      overflow: hidden;
+    }
+
+    .comanda-full-items,
+    .comanda-full-add {
+      min-height: 0;
+      overflow: auto;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      background: #fff;
+      padding: 10px;
+    }
+
+    .comanda-full-items h4,
+    .comanda-full-add h4 {
+      margin: 0 0 8px;
+      font-size: 14px;
+      color: #0f172a;
+    }
+
+    .comanda-full .mesa-items-list {
+      max-height: none;
+      background: transparent;
+      padding: 0;
+    }
+
+    .mesa-item-card {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 10px;
+      padding: 10px;
+      border: 1px solid #e2e8f0;
+      border-left: 5px solid #64748b;
+      border-radius: 8px;
+      background: #fff;
+      margin-bottom: 8px;
+    }
+
+    .mesa-item-card.anotado {
+      border-left-color: #f59e0b;
+      background: #fff7ed;
+    }
+
+    .mesa-item-card.saiu {
+      border-left-color: #16a34a;
+      background: #f0fdf4;
+    }
+
+    .mesa-item-main strong {
+      display: block;
+      font-size: 13px;
+      color: #0f172a;
+    }
+
+    .mesa-item-main small {
+      display: block;
+      margin-top: 2px;
+      font-size: 11px;
+      color: #64748b;
+    }
+
+    .mesa-item-actions {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    @media (max-width: 1100px) {
+      .comanda-full-body {
+        grid-template-columns: 1fr;
+        overflow: auto;
+      }
+    }
+
+    @media (max-width: 760px) {
+      .comanda-full-top {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+    }
+
+    .mesa-grupo-titulo {
+      margin: 8px 0 4px;
+      font-size: 11px;
+      font-weight: 800;
+      color: #334155;
+      text-transform: uppercase;
+    }
+
+    /* Design pass: menos desperdício de espaço e texto mais legível */
+    .app-content {
+      padding: 10px;
+    }
+
+    .two-column-layout {
+      grid-template-columns: minmax(0, 1.75fr) minmax(360px, 0.9fr);
+      gap: 10px;
+      height: calc(100vh - 92px);
+    }
+
+    .main-content,
+    .sidebar {
+      border: 1px solid #dbe3ef;
+      border-radius: 8px;
+      box-shadow: none;
+    }
+
+    .main-content {
+      padding: 10px;
+    }
+
+    .sidebar {
+      padding: 10px;
+      height: calc(100vh - 92px);
+      top: 10px;
+    }
+
+    .main-content > h2 {
+      font-size: 20px;
+      margin-bottom: 10px;
+    }
+
+    .sidebar h3 {
+      font-size: 16px;
+      padding-bottom: 7px;
+      margin-bottom: 10px;
+    }
+
+    .products-main {
+      grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+      gap: 10px;
+    }
+
+    .product-card {
+      align-items: stretch;
+      text-align: left;
+      padding: 10px;
+      min-height: 156px;
+    }
+
+    .product-image {
+      height: 86px;
+      margin-bottom: 8px;
+    }
+
+    .product-name,
+    .produto-mesa-card-name,
+    .product-list-item-name {
+      font-size: 14px;
+      line-height: 1.25;
+    }
+
+    .product-price,
+    .produto-mesa-card-price {
+      font-size: 15px;
+    }
+
+    .product-meta {
+      font-size: 12px;
+      color: #64748b;
+    }
+
+    .produtos-mesa-grid {
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 8px;
+    }
+
+    .produto-mesa-card {
+      text-align: left;
+      padding: 9px;
+      min-height: 132px;
+    }
+
+    .produto-mesa-card-img {
+      height: 62px;
+    }
+
+    .product-list {
+      gap: 6px;
+    }
+
+    .product-list-item {
+      padding: 9px 10px;
+    }
+
+    .product-list-item-info {
+      gap: 8px;
+      font-size: 13px;
+    }
+
+    .cart-section,
+    .mesa-items-list {
+      max-height: 180px;
+      font-size: 13px;
+    }
+
+    .category-chip {
+      font-size: 13px;
+      padding: 7px 11px;
+      border-radius: 8px;
+    }
+
+    .btn {
+      border-radius: 6px;
+      letter-spacing: 0;
+    }
+
+    input,
+    select,
+    textarea {
+      font-size: 14px;
+      padding: 10px;
+    }
+
+    @media (max-width: 1100px) {
+      .two-column-layout {
+        grid-template-columns: 1fr;
+        height: auto;
+      }
+
+      .sidebar {
+        height: auto;
+        position: static;
+      }
+    }
+
   </style>
 </head>
 <body class="app-page">
@@ -236,6 +614,7 @@
               Total: <span id="carrinhoTotal" style="color:var(--success);font-weight:bold">R$ 0,00</span>
             </div>
             <button id="btnFinalizarVenda" class="btn btn-primary btn-block" style="font-size:12px;padding:10px">Abrir Comanda</button>
+            <button id="btnLinkAutoAtendimento" class="btn btn-secondary btn-block" type="button" style="font-size:12px;padding:10px;margin-top:8px">Link Autoatendimento</button>
           </div>
 
           <hr style="margin:12px 0;border:none;border-top:1px solid #eee" />
@@ -294,6 +673,22 @@
             <button id="btnCriarProduto" class="btn btn-primary btn-block" style="font-size:12px;padding:10px">Criar Produto</button>
             <button id="btnCancelarEdicao" class="btn secondary btn-block" style="font-size:12px;padding:10px;display:none;margin-top:8px">Cancelar</button>
           </div>
+          <hr style="margin:12px 0;border:none;border-top:1px solid #eee" />
+          <div class="sidebar-section">
+            <h3>Adicionar Vários</h3>
+            <input list="categoriasList" type="text" id="loteCategoria" placeholder="Categoria do lote" style="font-size:12px;padding:8px;margin-bottom:8px;width:100%" />
+            <div class="bulk-products">
+              <div class="bulk-products-head">
+                <span>Nome</span>
+                <span>Preço</span>
+                <span>Estoque</span>
+                <span></span>
+              </div>
+              <div id="loteProdutosRows"></div>
+              <button id="btnAddProdutoLote" class="btn btn-secondary btn-block" type="button" style="font-size:12px;padding:8px">Adicionar linha</button>
+            </div>
+            <button id="btnCriarProdutosLote" class="btn btn-secondary btn-block" type="button" style="font-size:12px;padding:10px">Criar produtos do lote</button>
+          </div>
         </div>
       </div>
     </section>
@@ -310,6 +705,7 @@
               <button id="btnAbrirCaixa" class="btn btn-primary btn-soft" type="button">Abrir Caixa</button>
               <button id="btnFecharCaixa" class="btn btn-secondary btn-soft" type="button">Fechar Caixa</button>
             </div>
+            <div id="autoPedidosPendentes" style="margin-bottom:10px"></div>
             <div style="display:grid;grid-template-columns:1fr 150px;gap:8px;margin-bottom:10px">
               <input type="text" id="buscaComanda" placeholder="Buscar por mesa, balcão ou ID" style="font-size:12px;padding:8px">
               <select id="filtroStatusComanda" style="font-size:12px;padding:8px">
@@ -374,9 +770,14 @@
             <textarea id="promoDescricao" placeholder="Descrição (opcional)" style="min-height:70px;margin-bottom:8px"></textarea>
             <select id="promoTipo" style="margin-bottom:8px">
               <option value="combo_produto">Combo de produto</option>
+              <option value="ganhe_produto">Compra e ganha produto</option>
             </select>
             <label style="font-size:12px;color:#64748b;margin-bottom:4px;display:block">Produto</label>
             <select id="promoProdutoId" style="margin-bottom:8px"></select>
+            <label style="font-size:12px;color:#64748b;margin-bottom:4px;display:block">Variação específica (opcional)</label>
+            <select id="promoVariacaoNome" style="margin-bottom:8px">
+              <option value="">Todas as variações do produto</option>
+            </select>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
               <div>
                 <label style="font-size:12px;color:#64748b;margin-bottom:4px;display:block">Quantidade</label>
@@ -386,6 +787,12 @@
                 <label style="font-size:12px;color:#64748b;margin-bottom:4px;display:block">Preço combo</label>
                 <input type="number" id="promoPrecoCombo" step="0.01" min="0" value="15">
               </div>
+            </div>
+            <div id="promoBonusBox" style="display:none;margin-top:8px">
+              <label style="font-size:12px;color:#64748b;margin-bottom:4px;display:block">Produto bônus</label>
+              <select id="promoProdutoBonusId" style="margin-bottom:8px"></select>
+              <label style="font-size:12px;color:#64748b;margin-bottom:4px;display:block">Quantidade bônus</label>
+              <input type="number" id="promoProdutoBonusQtd" min="1" value="1">
             </div>
             <label style="display:flex;align-items:center;gap:8px;font-size:12px;color:#666;margin:8px 0">
               <input type="checkbox" id="promoRepetirNaVenda" checked style="width:auto">

@@ -14,6 +14,7 @@ import caixaRoutes from './caixa.js';
 import pixRoutes from './pix.js';
 import pagamentosRoutes from './pagamentos.js';
 import promocoesRoutes from './promocoes.js';
+import publicRoutes from './public.js';
 
 const router = express.Router();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -65,6 +66,7 @@ router.use('/caixa', caixaRoutes);
 router.use('/pix', pixRoutes);
 router.use('/pagamentos', pagamentosRoutes);
 router.use('/promocoes', promocoesRoutes);
+router.use('/public', publicRoutes);
 
 // Health check
 router.get('/status', (req, res) => {

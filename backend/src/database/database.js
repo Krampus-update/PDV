@@ -160,6 +160,10 @@ function tenantSchemaQueries() {
       numero_pedido INTEGER,
       mesa TEXT,
       cliente_id INTEGER,
+      auto_cliente_nome TEXT,
+      auto_cliente_contato TEXT,
+      origem TEXT DEFAULT 'operador',
+      aprovacao_status TEXT DEFAULT 'aprovado',
       caixa_sessao_id INTEGER,
       subtotal_bruto DECIMAL(10, 2) NOT NULL DEFAULT 0,
       desconto_tipo TEXT,
@@ -191,6 +195,7 @@ function tenantSchemaQueries() {
       consumo_estoque INTEGER NOT NULL DEFAULT 1,
       subtotal DECIMAL(10, 2) NOT NULL,
       observacoes TEXT,
+      status_item TEXT NOT NULL DEFAULT 'anotado',
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (venda_id) REFERENCES vendas(id) ON DELETE CASCADE,
       FOREIGN KEY (produto_id) REFERENCES produtos(id)
@@ -251,6 +256,9 @@ function tenantSchemaQueries() {
       descricao TEXT,
       tipo TEXT NOT NULL DEFAULT 'combo_produto',
       produto_id INTEGER,
+      variacao_nome TEXT,
+      produto_bonus_id INTEGER,
+      produto_bonus_quantidade INTEGER NOT NULL DEFAULT 1,
       quantidade_min INTEGER NOT NULL DEFAULT 0,
       repetir_na_venda BOOLEAN DEFAULT 1,
       preco_combo DECIMAL(10,2),
@@ -385,6 +393,18 @@ async function initializeTenantDatabase(code) {
   if (!cols.some((c) => c.name === 'pagamento_status')) {
     await runQuery(db, 'ALTER TABLE vendas ADD COLUMN pagamento_status TEXT');
   }
+  if (!cols.some((c) => c.name === 'auto_cliente_nome')) {
+    await runQuery(db, 'ALTER TABLE vendas ADD COLUMN auto_cliente_nome TEXT');
+  }
+  if (!cols.some((c) => c.name === 'auto_cliente_contato')) {
+    await runQuery(db, 'ALTER TABLE vendas ADD COLUMN auto_cliente_contato TEXT');
+  }
+  if (!cols.some((c) => c.name === 'origem')) {
+    await runQuery(db, "ALTER TABLE vendas ADD COLUMN origem TEXT DEFAULT 'operador'");
+  }
+  if (!cols.some((c) => c.name === 'aprovacao_status')) {
+    await runQuery(db, "ALTER TABLE vendas ADD COLUMN aprovacao_status TEXT DEFAULT 'aprovado'");
+  }
   if (!cols.some((c) => c.name === 'pagamento_transacao_id')) {
     await runQuery(db, 'ALTER TABLE vendas ADD COLUMN pagamento_transacao_id TEXT');
   }
@@ -405,7 +425,20 @@ async function initializeTenantDatabase(code) {
   if (!promoCols.some((c) => c.name === 'repetir_na_venda')) {
     await runQuery(db, 'ALTER TABLE promocoes ADD COLUMN repetir_na_venda BOOLEAN DEFAULT 1');
   }
+  if (!promoCols.some((c) => c.name === 'variacao_nome')) {
+    await runQuery(db, 'ALTER TABLE promocoes ADD COLUMN variacao_nome TEXT');
+  }
+  if (!promoCols.some((c) => c.name === 'produto_bonus_id')) {
+    await runQuery(db, 'ALTER TABLE promocoes ADD COLUMN produto_bonus_id INTEGER');
+  }
+  if (!promoCols.some((c) => c.name === 'produto_bonus_quantidade')) {
+    await runQuery(db, 'ALTER TABLE promocoes ADD COLUMN produto_bonus_quantidade INTEGER NOT NULL DEFAULT 1');
+  }
   const prodCols = await dbAll("PRAGMA table_info(produtos)", [], code);
+  const vendaItemCols = await dbAll("PRAGMA table_info(venda_itens)", [], code);
+  if (!vendaItemCols.some((c) => c.name === 'status_item')) {
+    await runQuery(db, "ALTER TABLE venda_itens ADD COLUMN status_item TEXT NOT NULL DEFAULT 'anotado'");
+  }
   if (!prodCols.some((c) => c.name === 'imagem')) {
     await runQuery(db, 'ALTER TABLE produtos ADD COLUMN imagem TEXT');
   }

@@ -12,14 +12,18 @@ class VendaModel {
     }
 
     const result = await dbRun(
-      `INSERT INTO vendas (tipo, status, numero_pedido, mesa, cliente_id, caixa_sessao_id, total) 
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO vendas (tipo, status, numero_pedido, mesa, cliente_id, auto_cliente_nome, auto_cliente_contato, origem, aprovacao_status, caixa_sessao_id, total) 
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         dados.tipo,
         dados.status || 'aberta',
         numero_pedido,
         dados.mesa || null,
         dados.cliente_id || null,
+        dados.auto_cliente_nome || null,
+        dados.auto_cliente_contato || null,
+        dados.origem || 'operador',
+        dados.aprovacao_status || 'aprovado',
         dados.caixa_sessao_id || null,
         dados.total || 0
       ]
@@ -122,6 +126,10 @@ class VendaModel {
           'forma_pagamento',
           'observacoes',
           'mesa',
+          'auto_cliente_nome',
+          'auto_cliente_contato',
+          'origem',
+          'aprovacao_status',
           'caixa_sessao_id',
           'subtotal_bruto',
           'desconto_tipo',

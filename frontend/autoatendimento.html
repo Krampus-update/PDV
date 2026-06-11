@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Autoatendimento</title>
+  <link rel="stylesheet" href="css/global.css">
+  <style>
+    body { background:#f1f5f9; }
+    .auto-wrap { max-width: 980px; margin: 0 auto; padding: 14px; }
+    .auto-head { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:12px; }
+    .auto-head h1 { margin:0; font-size:24px; color:#0f172a; }
+    .auto-grid { display:grid; grid-template-columns: minmax(0,1fr) 320px; gap:12px; align-items:start; }
+    .auto-products { display:grid; grid-template-columns: repeat(auto-fill,minmax(170px,1fr)); gap:10px; }
+    .auto-card { border:1px solid #dbe3ef; border-radius:8px; background:#fff; padding:10px; display:flex; flex-direction:column; gap:6px; min-height:120px; }
+    .auto-card strong { font-size:15px; color:#0f172a; }
+    .auto-card small { color:#64748b; font-size:12px; }
+    .auto-cart { position:sticky; top:10px; border:1px solid #dbe3ef; border-radius:8px; background:#fff; padding:12px; }
+    .auto-cart h2 { margin:0 0 10px; font-size:17px; color:#0f172a; }
+    .auto-item { display:flex; justify-content:space-between; gap:8px; padding:7px 0; border-bottom:1px solid #e2e8f0; font-size:13px; }
+    .auto-total { display:flex; justify-content:space-between; margin:10px 0; font-size:16px; font-weight:800; }
+    @media (max-width: 780px) { .auto-grid { grid-template-columns:1fr; } .auto-cart { position:static; } }
+  </style>
+</head>
+<body>
+  <main class="auto-wrap">
+    <div class="auto-head">
+      <div>
+        <h1>Cardápio</h1>
+        <p id="autoMeta" style="margin:3px 0 0;color:#64748b;font-size:13px">Carregando...</p>
+      </div>
+    </div>
+    <div class="auto-grid">
+      <section>
+        <input id="busca" placeholder="Buscar produto" style="margin-bottom:10px">
+        <div id="produtos" class="auto-products"></div>
+      </section>
+      <aside class="auto-cart">
+        <h2>Pedido</h2>
+        <input id="clienteNomeAuto" placeholder="Seu nome" style="margin-bottom:8px">
+        <input id="clienteMesaAuto" placeholder="Mesa ou retirada" style="margin-bottom:8px">
+        <div id="itensAuto"></div>
+        <div class="auto-total"><span>Total</span><span id="totalAuto">R$ 0,00</span></div>
+        <button id="btnEnviarPedido" class="btn btn-success btn-block" type="button">Enviar pedido</button>
+      </aside>
+    </div>
+  </main>
+  <script>
+    const params = new URLSearchParams(location.search);
+    const tenant = params.get('tenant') || params.get('restaurante') || '';
+    const API_BASE_AUTO = `http://${location.hostname}:3000/api`;
+    const moeda = (v) => new Intl.NumberFormat('pt-BR', { style:'currency', currency:'BRL' }).format(Number(v || 0));
+    let produtos = [];
+    let carrinho = [];
+
+    async function carregar() {
+      if (!tenant) {
+        document.getElementById('autoMeta').textContent = 'Link inválido: restaurante não informado.';
+        return;
+      }
+      const resp = await fetch(`${API_BASE_AUTO}/public/cardapio?restaurante=${encodeURIComponent(tenant)}`);
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.error || 'Erro ao carregar cardápio');
+      produtos = data.produtos || [];
+      document.getElementById('autoMeta').textContent = `${produtos.length} produto(s) disponíveis`;
+      renderProdutos();
+      renderCarrinho();
+    }
+
+    function renderProdutos() {
+      const termo = String(document.getElementById('busca').value || '').toLowerCase();
+      const lista = produtos.filter((p) => String(p.nome || '').toLowerCase().includes(termo));
+      document.getElementById('produtos').innerHTML = lista.map((p) => `
+        <div class="auto-card">
+          <strong>${p.nome}</strong>
+          <small>${p.categoria || 'geral'} • ${Number(p.estoque || 0)} disponível(is)</small>
+          <div style="font-weight:800;color:#16a34a">${moeda(p.preco)}</div>
+          <button class="btn btn-primary btn-small" onclick="add(${p.id})">Adicionar</button>
+        </div>`).join('') || '<p>Nenhum produto encontrado.</p>';
+    }
+
+    function add(id) {
+      const p = produtos.find((x) => Number(x.id) === Number(id));
+      if (!p) return;
+      const item = carrinho.find((x) => Number(x.id) === Number(id));
+      if (item) item.qtd += 1;
+      else carrinho.push({ id:p.id, nome:p.nome, preco:Number(p.preco || 0), qtd:1 });
+      renderCarrinho();
+    }
+
+    function alterar(id, delta) {
+      const item = carrinho.find((x) => Number(x.id) === Number(id));
+      if (!item) return;
+      item.qtd += delta;
+      if (item.qtd <= 0) carrinho = carrinho.filter((x) => Number(x.id) !== Number(id));
+      renderCarrinho();
+    }
+
+    function renderCarrinho() {
+      const total = carrinho.reduce((s, i) => s + i.preco * i.qtd, 0);
+      document.getElementById('itensAuto').innerHTML = carrinho.map((i) => `
+        <div class="auto-item">
+          <span>${i.qtd}x ${i.nome}</span>
+          <span>
+            <button onclick="alterar(${i.id},-1)">-</button>
+            <button onclick="alterar(${i.id},1)">+</button>
+            ${moeda(i.preco * i.qtd)}
+          </span>
+        </div>`).join('') || '<p style="font-size:13px;color:#64748b">Nenhum item.</p>';
+      document.getElementById('totalAuto').textContent = moeda(total);
+    }
+
+    document.getElementById('busca').addEventListener('input', renderProdutos);
+    document.getElementById('btnEnviarPedido').addEventListener('click', async () => {
+      if (!carrinho.length) return alert('Adicione produtos ao pedido.');
+      const nome = document.getElementById('clienteNomeAuto').value.trim() || 'Cliente';
+      const mesa = document.getElementById('clienteMesaAuto').value.trim() || 'Sem mesa';
+      const resp = await fetch(`${API_BASE_AUTO}/public/pedidos?restaurante=${encodeURIComponent(tenant)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cliente_nome: nome,
+          mesa,
+          itens: carrinho.map((i) => ({ produto_id: i.id, quantidade: i.qtd }))
+        })
+      });
+      const data = await resp.json();
+      if (!resp.ok) return alert(data.error || 'Erro ao enviar pedido');
+      carrinho = [];
+      renderCarrinho();
+      alert(`Pedido #${data.venda_id} enviado para aprovação.`);
+    });
+    carregar().catch((e) => document.getElementById('autoMeta').textContent = e.message);
+  </script>
+</body>
+</html>

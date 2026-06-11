@@ -72,6 +72,58 @@ class ProdutoController {
     }
   }
 
+  static async criarLote(req, res) {
+    try {
+      const itens = Array.isArray(req.body?.itens) ? req.body.itens : [];
+      const categoria = String(req.body?.categoria || 'geral').trim() || 'geral';
+      const criados = [];
+      const ignorados = [];
+      if (!itens.length) {
+        return res.status(400).json({ error: 'Informe ao menos um produto' });
+      }
+
+      const existentes = await ProdutoModel.obterTodos(false);
+      const nomesUsados = new Set((existentes || []).map((p) => String(p.nome || '').trim().toLowerCase()).filter(Boolean));
+
+      for (const item of itens) {
+        const nome = String(item?.nome || '').trim();
+        const preco = Number.parseFloat(item?.preco || 0);
+        if (!nome || !Number.isFinite(preco) || preco <= 0) continue;
+        const chaveNome = nome.toLowerCase();
+        if (nomesUsados.has(chaveNome)) {
+          ignorados.push({ nome, motivo: 'Produto já cadastrado' });
+          continue;
+        }
+        const id = await ProdutoModel.criar({
+          nome,
+          preco,
+          estoque: parseInt(item?.estoque, 10) || 0,
+          estoque_minimo: parseInt(item?.estoque_minimo, 10) || 0,
+          tipo: 'simples',
+          categoria,
+          destaque: item?.destaque === true || item?.destaque === 1 || item?.destaque === '1',
+          popularidade: parseInt(item?.popularidade, 10) || 0,
+          opcoes_json: normalizarOpcoesJson(item?.opcoes_json),
+          imagem: item?.imagem || null,
+          vai_cozinha: item?.vai_cozinha === true || item?.vai_cozinha === 1 || item?.vai_cozinha === '1'
+        });
+        nomesUsados.add(chaveNome);
+        criados.push({ id, nome });
+        await registrarHistorico('produto_criado_lote', id, { nome, categoria, preco });
+      }
+
+      if (!criados.length && !ignorados.length) {
+        return res.status(400).json({ error: 'Nenhum produto válido no lote' });
+      }
+
+      res.status(criados.length ? 201 : 200).json({ message: 'Lote processado', criados, ignorados });
+      if (criados.length) broadcast('produto.lote_criado', { total: criados.length, categoria });
+    } catch (error) {
+      console.error('Erro ao criar produtos em lote:', error);
+      res.status(500).json({ error: error.message });
+    }
+  }
+
   static async obterTodos(req, res) {
     try {
       const { incluir_inativos } = req.query;
@@ -130,6 +182,23 @@ class ProdutoController {
       broadcast('produto.atualizado', { id: parseInt(id, 10), dados });
     } catch (error) {
       console.error('Erro ao atualizar produto:', error);
+      res.status(500).json({ error: error.message });
+    }
+  }
+
+  static async renomearCategoria(req, res) {
+    try {
+      const categoriaAtual = String(req.body?.categoria_atual || '').trim();
+      const categoriaNova = String(req.body?.categoria_nova || '').trim();
+      if (!categoriaAtual || !categoriaNova) {
+        return res.status(400).json({ error: 'Informe categoria atual e nova categoria' });
+      }
+      const alterados = await ProdutoModel.atualizarCategoria(categoriaAtual, categoriaNova);
+      await registrarHistorico('categoria_renomeada', 0, { categoria_atual: categoriaAtual, categoria_nova: categoriaNova, alterados });
+      res.json({ message: 'Categoria atualizada com sucesso', alterados });
+      broadcast('produto.categoria_renomeada', { categoria_atual: categoriaAtual, categoria_nova: categoriaNova, alterados });
+    } catch (error) {
+      console.error('Erro ao renomear categoria:', error);
       res.status(500).json({ error: error.message });
     }
   }

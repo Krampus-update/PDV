@@ -78,6 +78,17 @@ class API {
         return this.request('POST', '/produtos', dados);
     }
 
+    static async criarProdutosLote(categoria, itens) {
+        return this.request('POST', '/produtos/lote', { categoria, itens });
+    }
+
+    static async renomearCategoria(categoriaAtual, categoriaNova) {
+        return this.request('PUT', '/produtos/categoria/renomear', {
+            categoria_atual: categoriaAtual,
+            categoria_nova: categoriaNova
+        });
+    }
+
     static async atualizarProduto(id, dados) {
         return this.request('PUT', `/produtos/${id}`, dados);
     }
@@ -263,6 +274,12 @@ class API {
         });
     }
 
+    static async atualizarStatusItem(vendaId, itemId, statusItem) {
+        return this.request('PUT', `/vendas/${vendaId}/itens/${itemId}/status`, {
+            status_item: statusItem
+        });
+    }
+
     static async removerItem(vendaId, itemId) {
         return this.request('DELETE', `/vendas/${vendaId}/itens/${itemId}`);
     }
@@ -284,6 +301,14 @@ class API {
         return this.request('PUT', `/vendas/${vendaId}/status`, {
             status
         });
+    }
+
+    static async aprovarAutoatendimento(vendaId) {
+        return this.request('PUT', `/vendas/${vendaId}/auto/aprovar`);
+    }
+
+    static async recusarAutoatendimento(vendaId, motivo = '') {
+        return this.request('PUT', `/vendas/${vendaId}/auto/recusar`, { motivo });
     }
 
     static async vincularClienteVenda(vendaId, cliente_id = null) {

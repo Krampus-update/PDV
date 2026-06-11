@@ -98,6 +98,13 @@ function money(value) {
   return Number(value || 0).toFixed(2).replace('.', ',');
 }
 
+function plain(text) {
+  return String(text || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^\x20-\x7E\n]/g, '');
+}
+
 function line(width, char = '-') {
   return char.repeat(Math.max(1, width));
 }
@@ -127,11 +134,11 @@ function buildVendaTicket(venda, itens, cfg, tipo = 'balcao') {
   const mesa = venda.mesa ? `Mesa ${venda.mesa}` : `Comanda #${venda.id}`;
 
   const rows = [
-    padRight(cfg.nome.toUpperCase(), width),
+    padRight(plain(cfg.nome).toUpperCase(), width),
     line(width, '='),
     padRight(titulo, width),
-    `${mesa}  ${now}`.slice(0, width),
-    `Status: ${venda.status}`.slice(0, width),
+    plain(`${mesa}  ${now}`).slice(0, width),
+    plain(`Status: ${venda.status}`).slice(0, width),
     line(width)
   ];
 
@@ -146,9 +153,10 @@ function buildVendaTicket(venda, itens, cfg, tipo = 'balcao') {
     const sub = Number(item.subtotal || qtd * unit);
     total += sub;
     const head = `${qtd}x ${item.produto_nome || 'Item'}`;
-    rows.push(...wrap(head, width));
+    rows.push(...wrap(plain(head), width));
+    if (item.observacoes) rows.push(...wrap(plain(`  Obs: ${item.observacoes}`), width));
     if (tipo !== 'cozinha') {
-      rows.push(`  ${money(unit)} -> ${money(sub)}`.slice(0, width));
+      rows.push(`  R$ ${money(unit)} -> R$ ${money(sub)}`.slice(0, width));
     }
   }
 
@@ -158,20 +166,20 @@ function buildVendaTicket(venda, itens, cfg, tipo = 'balcao') {
     const desconto = Number(venda.desconto_valor || 0);
     const acrescimo = Number(venda.acrescimo_valor || 0);
     if (desconto > 0) rows.push(`Desconto: -R$ ${money(desconto)}`.slice(0, width));
-    if (acrescimo > 0) rows.push(`Acréscimo: +R$ ${money(acrescimo)}`.slice(0, width));
+    if (acrescimo > 0) rows.push(plain(`Acrescimo: +R$ ${money(acrescimo)}`).slice(0, width));
     rows.push(`Subtotal: R$ ${money(bruto)}`.slice(0, width));
     rows.push(`TOTAL: R$ ${money(Number(venda.total || total))}`.slice(0, width));
     if (venda.forma_pagamento) rows.push(`PAGTO: ${venda.forma_pagamento}`.slice(0, width));
     if (Number(venda.valor_pago || 0) > 0) rows.push(`Pago: R$ ${money(venda.valor_pago)}`.slice(0, width));
     if (Number(venda.troco_valor || 0) > 0) rows.push(`Troco: R$ ${money(venda.troco_valor)}`.slice(0, width));
-    if (venda.split_mode) rows.push(`Divisão: ${String(venda.split_mode)}`.slice(0, width));
+    if (venda.split_mode) rows.push(plain(`Divisao: ${String(venda.split_mode)}`).slice(0, width));
     if (venda.pix_chave_utilizada) {
       rows.push(line(width));
       rows.push('PIX');
-      rows.push(`Chave: ${String(venda.pix_chave_utilizada)}`.slice(0, width));
+      rows.push(plain(`Chave: ${String(venda.pix_chave_utilizada)}`).slice(0, width));
       if (venda.pix_payload) {
         rows.push('Copia e cola:');
-        rows.push(...wrap(String(venda.pix_payload), width));
+        rows.push(...wrap(plain(String(venda.pix_payload)), width));
       }
     }
   } else {
@@ -210,7 +218,7 @@ function writeSocket(host, port, data, timeoutMs = 4000) {
 
 function montarPayload(texto, cfg) {
   const init = Buffer.from([0x1b, 0x40]); // ESC @
-  const body = Buffer.from(`${texto}\n`, 'ascii');
+  const body = Buffer.from(`${plain(texto)}\n`, 'ascii');
   const cut = cfg.corte ? Buffer.from([0x1d, 0x56, 0x41, 0x10]) : Buffer.alloc(0); // GS V A n
   return Buffer.concat([init, body, cut]);
 }

@@ -9,6 +9,12 @@ router.use(authOptional, authRequired);
 // Criar novo produto
 router.post('/', ProdutoController.criar);
 
+// Criar vários produtos na mesma categoria
+router.post('/lote', ProdutoController.criarLote);
+
+// Renomear categoria em todos os produtos
+router.put('/categoria/renomear', ProdutoController.renomearCategoria);
+
 // Obter todos os produtos
 router.get('/', ProdutoController.obterTodos);
 

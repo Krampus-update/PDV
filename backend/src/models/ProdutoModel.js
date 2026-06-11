@@ -73,6 +73,16 @@ class ProdutoModel {
     );
     return result.changes;
   }
+
+  static async atualizarCategoria(categoriaAtual, categoriaNova) {
+    const result = await dbRun(
+      `UPDATE produtos
+       SET categoria = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE LOWER(TRIM(categoria)) = LOWER(TRIM(?)) AND tipo != 'avulso'`,
+      [categoriaNova, categoriaAtual]
+    );
+    return result.changes;
+  }
 }
 
 export default ProdutoModel;
