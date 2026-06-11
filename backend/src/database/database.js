@@ -287,13 +287,10 @@ function tenantSchemaQueries() {
       descricao TEXT,
       tipo TEXT NOT NULL DEFAULT 'combo_produto',
       produto_id INTEGER,
-<<<<<<< HEAD
       variacao_nome TEXT,
       produto_bonus_id INTEGER,
       produto_bonus_quantidade INTEGER NOT NULL DEFAULT 1,
-=======
       categoria TEXT,
->>>>>>> de082d523ba64c5da2e1d8b0a8a008b9018ee045
       quantidade_min INTEGER NOT NULL DEFAULT 0,
       repetir_na_venda BOOLEAN DEFAULT 1,
       preco_combo DECIMAL(10,2),
@@ -460,7 +457,6 @@ async function initializeTenantDatabase(code) {
   if (!promoCols.some((c) => c.name === 'repetir_na_venda')) {
     await runQuery(db, 'ALTER TABLE promocoes ADD COLUMN repetir_na_venda BOOLEAN DEFAULT 1');
   }
-<<<<<<< HEAD
   if (!promoCols.some((c) => c.name === 'variacao_nome')) {
     await runQuery(db, 'ALTER TABLE promocoes ADD COLUMN variacao_nome TEXT');
   }
@@ -468,11 +464,14 @@ async function initializeTenantDatabase(code) {
     await runQuery(db, 'ALTER TABLE promocoes ADD COLUMN produto_bonus_id INTEGER');
   }
   if (!promoCols.some((c) => c.name === 'produto_bonus_quantidade')) {
-    await runQuery(db, 'ALTER TABLE promocoes ADD COLUMN produto_bonus_quantidade INTEGER NOT NULL DEFAULT 1');
-=======
+    await runQuery(
+      db,
+      'ALTER TABLE promocoes ADD COLUMN produto_bonus_quantidade INTEGER NOT NULL DEFAULT 1'
+    );
+  }
+
   if (!promoCols.some((c) => c.name === 'categoria')) {
     await runQuery(db, 'ALTER TABLE promocoes ADD COLUMN categoria TEXT');
->>>>>>> de082d523ba64c5da2e1d8b0a8a008b9018ee045
   }
   const prodCols = await dbAll("PRAGMA table_info(produtos)", [], code);
   const vendaItemCols = await dbAll("PRAGMA table_info(venda_itens)", [], code);
@@ -558,10 +557,10 @@ async function initializeTenantDatabase(code) {
       { nome: 'Refrigerante', preco: 5.0, estoque: 40, estoque_minimo: 10, tipo: 'simples', categoria: 'bebidas', destaque: 1, popularidade: 8, opcoes_json: null, vai_cozinha: 0 },
       { nome: 'Suco', preco: 6.0, estoque: 30, estoque_minimo: 5, tipo: 'simples', categoria: 'bebidas', destaque: 0, popularidade: 5, opcoes_json: null, vai_cozinha: 0 },
       { nome: 'Cerveja', preco: 8.0, estoque: 50, estoque_minimo: 10, tipo: 'simples', categoria: 'bebidas', destaque: 1, popularidade: 9, opcoes_json: null, vai_cozinha: 0 },
-      { nome: 'Chopp', preco: 12.0, estoque: 100, estoque_minimo: 20, tipo: 'simples', categoria: 'bebidas', destaque: 1, popularidade: 10, opcoes_json: JSON.stringify([{nome:'300ml',extra:0},{nome:'500ml',extra:4},{nome:'1L',extra:12}]), vai_cozinha: 0 },
-      { nome: 'Hambúrguer', preco: 25.0, estoque: 20, estoque_minimo: 5, tipo: 'simples', categoria: 'comidas', destaque: 1, popularidade: 9, opcoes_json: JSON.stringify([{nome:'Sem adicional',extra:0},{nome:'Bacon',extra:5},{nome:'Queijo extra',extra:3}]), vai_cozinha: 1 },
+      { nome: 'Chopp', preco: 12.0, estoque: 100, estoque_minimo: 20, tipo: 'simples', categoria: 'bebidas', destaque: 1, popularidade: 10, opcoes_json: JSON.stringify([{ nome: '300ml', extra: 0 }, { nome: '500ml', extra: 4 }, { nome: '1L', extra: 12 }]), vai_cozinha: 0 },
+      { nome: 'Hambúrguer', preco: 25.0, estoque: 20, estoque_minimo: 5, tipo: 'simples', categoria: 'comidas', destaque: 1, popularidade: 9, opcoes_json: JSON.stringify([{ nome: 'Sem adicional', extra: 0 }, { nome: 'Bacon', extra: 5 }, { nome: 'Queijo extra', extra: 3 }]), vai_cozinha: 1 },
       { nome: 'Pastel', preco: 8.0, estoque: 30, estoque_minimo: 5, tipo: 'simples', categoria: 'comidas', destaque: 0, popularidade: 6, opcoes_json: null, vai_cozinha: 1 },
-      { nome: 'Batata Frita', preco: 12.0, estoque: 25, estoque_minimo: 5, tipo: 'simples', categoria: 'comidas', destaque: 1, popularidade: 8, opcoes_json: JSON.stringify([{nome:'Pequena',extra:0},{nome:'Média',extra:5},{nome:'Grande',extra:10}]), vai_cozinha: 1 },
+      { nome: 'Batata Frita', preco: 12.0, estoque: 25, estoque_minimo: 5, tipo: 'simples', categoria: 'comidas', destaque: 1, popularidade: 8, opcoes_json: JSON.stringify([{ nome: 'Pequena', extra: 0 }, { nome: 'Média', extra: 5 }, { nome: 'Grande', extra: 10 }]), vai_cozinha: 1 },
       { nome: 'Comida Composição', preco: 35.0, estoque: 15, estoque_minimo: 3, tipo: 'composto', categoria: 'comidas', destaque: 0, popularidade: 4, opcoes_json: null, vai_cozinha: 1 },
       { nome: 'Moqueca', preco: 45.0, estoque: 10, estoque_minimo: 2, tipo: 'composto', categoria: 'comidas', destaque: 0, popularidade: 3, opcoes_json: null, vai_cozinha: 1 }
     ];

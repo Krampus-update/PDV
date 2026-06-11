@@ -256,7 +256,6 @@ function buildVendaTicket(venda, itens, cfg, tipo = 'balcao') {
       ? `# Comanda ${mesa.replace(/^Mesa\s+/i, '')}`
       : `# Comanda ${venda.id}`;
 
-<<<<<<< HEAD
   const rows = [
     padRight(plain(cfg.nome).toUpperCase(), width),
     line(width, '='),
@@ -265,9 +264,6 @@ function buildVendaTicket(venda, itens, cfg, tipo = 'balcao') {
     plain(`Status: ${venda.status}`).slice(0, width),
     line(width)
   ];
-=======
-  const rows = [padRight(cabecalho, width), line(width, '=')];
->>>>>>> de082d523ba64c5da2e1d8b0a8a008b9018ee045
 
   let total = 0;
   const itensUsados = ehCozinha
@@ -285,19 +281,10 @@ function buildVendaTicket(venda, itens, cfg, tipo = 'balcao') {
     const sub = Number(item.subtotal || qtd * unit);
     total += sub;
     const head = `${qtd}x ${item.produto_nome || 'Item'}`;
-<<<<<<< HEAD
     rows.push(...wrap(plain(head), width));
     if (item.observacoes) rows.push(...wrap(plain(`  Obs: ${item.observacoes}`), width));
     if (tipo !== 'cozinha') {
       rows.push(`  R$ ${money(unit)} -> R$ ${money(sub)}`.slice(0, width));
-=======
-    if (ehCozinha) {
-      const obs = String(item.observacoes || '').trim();
-      rows.push(...wrap(obs ? `${head} - ${obs}` : head, width));
-    } else {
-      rows.push(...wrap(head, width));
-      rows.push(`  ${money(unit)} -> ${money(sub)}`.slice(0, width));
->>>>>>> de082d523ba64c5da2e1d8b0a8a008b9018ee045
     }
   }
 
