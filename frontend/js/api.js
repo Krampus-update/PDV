@@ -78,6 +78,7 @@ class API {
         return this.request('POST', '/produtos', dados);
     }
 
+<<<<<<< HEAD
     static async criarProdutosLote(categoria, itens) {
         return this.request('POST', '/produtos/lote', { categoria, itens });
     }
@@ -87,6 +88,24 @@ class API {
             categoria_atual: categoriaAtual,
             categoria_nova: categoriaNova
         });
+=======
+    // ===== CATEGORIAS =====
+    static async listarCategorias(ativas = false) {
+        const query = ativas ? '?ativas=true' : '';
+        return this.request('GET', `/categorias${query}`);
+    }
+
+    static async criarCategoria(dados) {
+        return this.request('POST', '/categorias', dados);
+    }
+
+    static async atualizarCategoria(id, dados) {
+        return this.request('PUT', `/categorias/${id}`, dados);
+    }
+
+    static async removerCategoria(id) {
+        return this.request('DELETE', `/categorias/${id}`);
+>>>>>>> de082d523ba64c5da2e1d8b0a8a008b9018ee045
     }
 
     static async atualizarProduto(id, dados) {
@@ -108,6 +127,10 @@ class API {
 
     static async me() {
         return this.request('GET', '/auth/me');
+    }
+
+    static async refreshSession() {
+        return this.request('POST', '/auth/refresh');
     }
 
     static async logout() {
@@ -140,24 +163,38 @@ class API {
     }
 
     // ===== IMPRESSÃO TÉRMICA =====
-    static async obterConfigImpressao() {
-        return this.request('GET', '/impressao/config');
+    static async listarConfigsImpressao() {
+        return this.request('GET', '/impressao/configs');
     }
 
-    static async salvarConfigImpressao(dados) {
-        return this.request('PUT', '/impressao/config', dados);
+    static async obterConfigImpressao(destino = 'balcao') {
+        const query = destino ? `?destino=${encodeURIComponent(destino)}` : '';
+        return this.request('GET', `/impressao/config${query}`);
+    }
+
+    static async salvarConfigImpressao(dados, destino = 'balcao') {
+        return this.request('PUT', `/impressao/config?destino=${encodeURIComponent(destino)}`, {
+            ...(dados || {}),
+            destino
+        });
+    }
+
+    static async removerConfigImpressao(destino = 'balcao') {
+        const query = destino ? `?destino=${encodeURIComponent(destino)}` : '';
+        return this.request('DELETE', `/impressao/config${query}`);
     }
 
     static async listarImpressorasLocais() {
         return this.request('GET', '/impressao/locais');
     }
 
-    static async testarImpressora() {
-        return this.request('POST', '/impressao/teste');
+    static async testarImpressora(destino = 'balcao') {
+        const query = destino ? `?destino=${encodeURIComponent(destino)}` : '';
+        return this.request('POST', `/impressao/teste${query}`);
     }
 
-    static async imprimirVenda(vendaId, tipo = 'balcao') {
-        return this.request('POST', `/impressao/venda/${vendaId}?tipo=${encodeURIComponent(tipo)}`);
+    static async imprimirVenda(vendaId, destino = 'balcao') {
+        return this.request('POST', `/impressao/venda/${vendaId}?destino=${encodeURIComponent(destino)}`);
     }
 
     // ===== VENDAS =====
@@ -205,6 +242,10 @@ class API {
         return this.request('GET', `/caixa/resumo-dia${query}`);
     }
 
+    static async listarHistoricoCaixa(limite = 30) {
+        return this.request('GET', `/caixa/historico?limite=${encodeURIComponent(limite)}`);
+    }
+
     static async obterEmPreparo() {
         return this.request('GET', '/vendas/preparacao/em-preparo');
     }
@@ -230,6 +271,39 @@ class API {
 
     static async executarBackup() {
         return this.request('POST', '/backup/executar');
+    }
+
+    static async removerBackup(arquivo) {
+        const query = arquivo ? `?arquivo=${encodeURIComponent(arquivo)}` : '';
+        return this.request('DELETE', `/backup${query}`);
+    }
+
+    static async obterStatusDev() {
+        return this.request('GET', '/dev/maintenance/status');
+    }
+
+    static async resetarBancoAtual() {
+        return this.request('POST', '/dev/maintenance/reset-db');
+    }
+
+    static async ativarAutostart() {
+        return this.request('POST', '/dev/maintenance/autostart/install');
+    }
+
+    static async desativarAutostart() {
+        return this.request('POST', '/dev/maintenance/autostart/remove');
+    }
+
+    static async listarTenants() {
+        return this.request('GET', '/dev/tenants');
+    }
+
+    static async criarTenant(dados) {
+        return this.request('POST', '/dev/tenants', dados);
+    }
+
+    static async removerTenant(code) {
+        return this.request('DELETE', `/dev/tenants/${encodeURIComponent(code)}`);
     }
 
     // ===== HISTÓRICO =====

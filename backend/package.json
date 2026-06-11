@@ -7,7 +7,8 @@
   "scripts": {
     "start": "node scripts/start-server.js",
     "dev": "node --watch server.js",
-    "dev:senha": "node scripts/print-dev-password.js"
+    "dev:senha": "node scripts/print-dev-password.js",
+    "test": "node --test"
   },
   "dependencies": {
     "cors": "^2.8.5",

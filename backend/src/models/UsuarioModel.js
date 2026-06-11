@@ -76,6 +76,11 @@ class UsuarioModel {
     return result.changes;
   }
 
+  static async removerUsuario(id) {
+    const result = await dbRun('DELETE FROM usuarios WHERE id = ?', [id]);
+    return result.changes;
+  }
+
   static async removerSessao(token) {
     const result = await dbRun('DELETE FROM sessoes WHERE token = ?', [token]);
     return result.changes;
@@ -93,6 +98,13 @@ class UsuarioModel {
       'INSERT INTO sessoes (usuario_id, token, expires_at) VALUES (?, ?, ?)',
       [usuario_id, token, expires]
     );
+    return { token, expires_at: expires };
+  }
+
+  static async renovarSessao(token, duracaoHoras = 12) {
+    const expires = new Date(Date.now() + duracaoHoras * 60 * 60 * 1000).toISOString();
+    const result = await dbRun('UPDATE sessoes SET expires_at = ? WHERE token = ?', [expires, token]);
+    if (!result.changes) return null;
     return { token, expires_at: expires };
   }
 

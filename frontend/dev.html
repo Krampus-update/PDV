@@ -1,0 +1,138 @@
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>PDV - Dev</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0f172a">
+  <link rel="stylesheet" href="css/global.css">
+  <style>
+    .app-content { height: calc(100vh - 72px); overflow: hidden; }
+    .hidden { display: none !important; }
+    .dev-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+    .dev-card { border: 1px solid #e2e8f0; border-radius: 16px; padding: 14px; background: #fff; box-shadow: 0 8px 24px rgba(15, 23, 42, 0.04); }
+    .dev-card h3 { margin: 0 0 10px; font-size: 14px; }
+    .dev-meta { font-size: 12px; color: #64748b; }
+    .dev-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .dev-tenant-row { display:flex; justify-content:space-between; gap:10px; padding:10px 12px; border:1px solid #e2e8f0; border-radius:10px; margin-bottom:8px; background:#f8fafc; }
+    .dev-tenant-row.active { border-color: var(--primary); box-shadow: inset 0 0 0 1px rgba(29,78,216,.08); }
+    .dev-tenant-row .meta { font-size: 11px; color:#64748b; }
+    .dev-tenant-actions { display:flex; gap:8px; align-items:center; }
+  </style>
+</head>
+<body class="app-page">
+  <header class="app-topbar">
+    <div class="topbar-left">
+      <div class="topbar-logo">PDV</div>
+      <div class="topbar-brand">
+        <div class="name" id="topRestaurantName">Restaurante</div>
+        <div class="meta" id="topRestaurantMeta">Tenant</div>
+      </div>
+      <span id="conexao" class="status online">● Online</span>
+    </div>
+
+    <nav class="topbar-center">
+      <button class="topbar-tab tab active" data-target="dev">Dev</button>
+    </nav>
+
+    <div class="topbar-right">
+      <div class="topbar-user-wrap">
+        <button id="topUserTrigger" class="topbar-user-trigger" type="button">
+          <div class="topbar-user">
+            <div class="user-avatar" id="topUserAvatar">US</div>
+            <div>
+              <div class="user-name" id="topUserName">Usuário</div>
+              <div class="meta" id="topUserRole"></div>
+            </div>
+          </div>
+        </button>
+        <div id="topUserMenu" class="user-menu hidden"></div>
+      </div>
+    </div>
+  </header>
+
+  <div class="app-content">
+    <section id="dev" class="tab-content">
+      <div class="two-column-layout">
+        <div class="main-content">
+          <h2>Dev Center</h2>
+          <div class="main-content-scroll">
+            <div class="dev-grid">
+              <div class="dev-card">
+                <h3>Ambiente</h3>
+                <div class="dev-meta" id="devEnvInfo">Carregando...</div>
+              </div>
+              <div class="dev-card">
+                <h3>Versões</h3>
+                <div class="dev-meta" id="devVersionInfo">Carregando...</div>
+              </div>
+              <div class="dev-card">
+                <h3>Serviços</h3>
+                <div class="dev-meta" id="devStatusInfo">Carregando...</div>
+              </div>
+              <div class="dev-card">
+                <h3>Atalhos</h3>
+                <div class="dev-actions">
+                  <a class="btn btn-secondary btn-soft" href="painel.html">Painel</a>
+                  <a class="btn btn-secondary btn-soft" href="garcom.html">Garçom</a>
+                  <a class="btn btn-secondary btn-soft" href="producao.html">Cozinha</a>
+                  <a class="btn btn-secondary btn-soft" href="admin.html">Admin</a>
+                  <a class="btn btn-secondary btn-soft" href="gerente.html">Gerente</a>
+                </div>
+              </div>
+              <div class="dev-card">
+                <h3>Ferramentas</h3>
+                <div class="dev-actions">
+                  <button id="btnDevLimparCache" class="btn btn-secondary btn-soft" type="button">Limpar cache local</button>
+                  <button id="btnDevRecarregar" class="btn btn-primary" type="button">Recarregar</button>
+                  <button id="btnDevConfig" class="btn btn-secondary btn-soft" type="button">Configurações</button>
+                </div>
+              </div>
+              <div class="dev-card">
+                <h3>Manutenção</h3>
+                <div class="dev-actions">
+                  <button id="btnDevResetDb" class="btn btn-secondary btn-soft" type="button">Resetar banco atual</button>
+                  <button id="btnDevInstallAutostart" class="btn btn-secondary btn-soft" type="button">Ativar auto-start</button>
+                  <button id="btnDevRemoveAutostart" class="btn btn-secondary btn-soft" type="button">Desativar auto-start</button>
+                </div>
+                <div class="dev-meta" id="devMaintenanceInfo" style="margin-top:10px">Carregando...</div>
+              </div>
+              <div class="dev-card">
+                <h3>Backups</h3>
+                <div class="dev-actions">
+                  <button id="btnDevBackupNow" class="btn btn-primary" type="button">Criar backup</button>
+                  <button id="btnDevReloadBackups" class="btn btn-secondary btn-soft" type="button">Atualizar lista</button>
+                </div>
+                <div id="devBackupsList" class="dev-tenants-list" style="margin-top:10px">Carregando...</div>
+              </div>
+              <div class="dev-card">
+                <h3>Lojas</h3>
+                <div class="dev-actions">
+                  <button id="btnDevNovaLoja" class="btn btn-primary" type="button">Criar loja</button>
+                  <button id="btnDevRecarregarLojas" class="btn btn-secondary btn-soft" type="button">Atualizar lista</button>
+                </div>
+                <div id="devTenantsList" class="dev-tenants-list" style="margin-top:10px">Carregando...</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <aside class="sidebar">
+          <div class="sidebar-section">
+            <h3>Token</h3>
+            <div id="devTokenInfo" style="font-size:12px;color:#64748b;">Carregando...</div>
+          </div>
+          <div class="sidebar-section">
+            <h3>Observações</h3>
+            <p style="font-size:12px;color:#64748b;margin:0;">Use esta tela para validar integrações e estados do app sem sair do fluxo.</p>
+          </div>
+        </aside>
+      </div>
+    </section>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/common.js"></script>
+  <script src="js/auth-guard.js"></script>
+  <script src="js/dev.js"></script>
+</body>
+</html>

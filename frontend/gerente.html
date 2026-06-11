@@ -1,0 +1,257 @@
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>PDV - Gerente</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0f172a">
+  <link rel="stylesheet" href="css/global.css">
+  <style>
+    .hidden { display: none !important; }
+    .app-content { height: calc(100vh - 72px); overflow: hidden; padding: 16px; }
+    .tab-content { height: 100%; }
+    .two-column-layout {
+      height: 100%;
+      display: grid;
+      grid-template-columns: minmax(0, 1.4fr) minmax(320px, 0.8fr);
+      gap: 16px;
+    }
+    .main-content,
+    .sidebar {
+      background: rgba(255, 255, 255, 0.88);
+      border: 1px solid rgba(226, 232, 240, 0.9);
+      border-radius: 20px;
+      box-shadow: var(--shadow);
+    }
+    .main-content {
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      min-width: 0;
+    }
+    .main-content h2 {
+      margin: 0 0 12px;
+      font-size: 20px;
+    }
+    .main-content-scroll {
+      flex: 1;
+      min-height: 0;
+      overflow: auto;
+      padding-right: 4px;
+    }
+    .sidebar {
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      min-width: 0;
+    }
+    .sidebar-section {
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      background: linear-gradient(180deg, #ffffff, #f8fbff);
+      padding: 14px;
+      box-shadow: var(--shadow);
+    }
+    .sidebar-section h3 {
+      margin: 0 0 12px;
+      font-size: 14px;
+    }
+    .card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+    .info-card {
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      padding: 12px;
+      background: linear-gradient(180deg, #ffffff, #f8fbff);
+      box-shadow: var(--shadow);
+    }
+    .info-card h4 { margin: 0 0 6px; font-size: 12px; color: #64748b; text-transform: uppercase; letter-spacing: 0.04em; }
+    .info-card strong { font-size: 18px; color: #0f172a; }
+    .table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .table th, .table td { padding: 10px 8px; border-bottom: 1px solid #e2e8f0; text-align: left; }
+    .table th { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 0.04em; }
+    .table tbody tr:hover { background: #f8fafc; }
+    .toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .toolbar select, .toolbar input { padding: 9px 10px; font-size: 12px; border-radius: 12px; }
+    .tag { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border-radius: 999px; font-size: 11px; background: #eef2ff; color: #1e3a8a; }
+    .user-list { display: flex; flex-direction: column; gap: 10px; }
+    .user-item {
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      padding: 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: linear-gradient(180deg, #ffffff, #f8fbff);
+      box-shadow: var(--shadow);
+    }
+    .user-item strong { font-size: 13px; }
+    .sidebar input,
+    .sidebar select {
+      border-radius: 12px;
+      border-color: #dbe3ef;
+    }
+  </style>
+</head>
+<body class="app-page">
+  <header class="app-topbar">
+    <div class="topbar-left">
+      <div class="topbar-logo">PDV</div>
+      <div class="topbar-brand">
+        <div class="name" id="topRestaurantName">Restaurante</div>
+        <div class="meta" id="topRestaurantMeta">Tenant</div>
+      </div>
+      <span id="conexao" class="status online">● Online</span>
+    </div>
+
+    <nav class="topbar-center">
+      <button class="topbar-tab tab active" data-target="relatorios">Relatórios</button>
+      <button class="topbar-tab tab" data-target="historico">Histórico</button>
+      <button class="topbar-tab tab" data-target="usuarios">Usuários</button>
+      <button class="topbar-tab tab" data-target="caixa">Caixa</button>
+    </nav>
+
+    <div class="topbar-right">
+      <div class="topbar-user-wrap">
+        <button id="topUserTrigger" class="topbar-user-trigger" type="button">
+          <div class="topbar-user">
+            <div class="user-avatar" id="topUserAvatar">US</div>
+            <div>
+              <div class="user-name" id="topUserName">Usuário</div>
+              <div class="meta" id="topUserRole"></div>
+            </div>
+          </div>
+        </button>
+        <div id="topUserMenu" class="user-menu hidden"></div>
+      </div>
+    </div>
+  </header>
+
+  <div class="app-content">
+    <section id="relatorios" class="tab-content">
+      <div class="two-column-layout">
+        <div class="main-content">
+          <h2>Relatórios</h2>
+          <div class="main-content-scroll">
+            <div class="toolbar" style="margin-bottom:12px;">
+              <label style="font-size:12px;color:#64748b;">Período</label>
+              <select id="relPeriodo">
+                <option value="hoje">Hoje</option>
+                <option value="7d">Últimos 7 dias</option>
+                <option value="30d">Últimos 30 dias</option>
+                <option value="mes">Este mês</option>
+              </select>
+              <button id="btnRelAtualizar" class="btn btn-secondary btn-soft" type="button">Atualizar</button>
+            </div>
+            <div id="relResumoCards" class="card-grid"></div>
+            <h3 style="margin:16px 0 8px;font-size:14px;">Produtos mais vendidos</h3>
+            <table class="table">
+              <thead>
+                <tr><th>Produto</th><th>Qtd</th><th>Total</th></tr>
+              </thead>
+              <tbody id="relProdutosBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <aside class="sidebar">
+          <div class="sidebar-section">
+            <h3>Status das vendas</h3>
+            <div id="relStatusList"></div>
+          </div>
+          <div class="sidebar-section">
+            <h3>Observações</h3>
+            <p style="font-size:12px;color:#64748b;margin:0">Relatórios usam vendas fechadas por padrão. Ajuste o período para análises rápidas.</p>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section id="historico" class="tab-content hidden">
+      <div class="two-column-layout">
+        <div class="main-content">
+          <h2>Histórico de Eventos</h2>
+          <div class="main-content-scroll">
+            <div class="toolbar" style="margin-bottom:12px;">
+              <input id="histFiltro" type="text" placeholder="Filtrar por ação ou entidade" />
+              <button id="btnHistAtualizar" class="btn btn-secondary btn-soft" type="button">Atualizar</button>
+            </div>
+            <div id="histLista"></div>
+          </div>
+        </div>
+        <aside class="sidebar">
+          <div class="sidebar-section">
+            <h3>Resumo rápido</h3>
+            <div id="histResumo" style="font-size:12px;color:#64748b;">Carregando...</div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section id="usuarios" class="tab-content hidden">
+      <div class="two-column-layout">
+        <div class="main-content">
+          <h2>Usuários</h2>
+          <div class="main-content-scroll">
+            <div id="usuariosLista" class="user-list"></div>
+          </div>
+        </div>
+        <aside class="sidebar">
+          <div class="sidebar-section">
+            <h3 id="usuarioFormTitulo">Novo usuário</h3>
+            <label class="field-label">Nome</label>
+            <input id="usuarioNome" type="text" placeholder="Nome do usuário" />
+            <label class="field-label">Login</label>
+            <input id="usuarioLogin" type="text" placeholder="Login" />
+            <label class="field-label">Perfil</label>
+            <select id="usuarioRole">
+              <option value="funcionario">Funcionário</option>
+              <option value="gerente">Gerente</option>
+              <option value="dev">Dev</option>
+            </select>
+            <label class="field-label">Senha</label>
+            <input id="usuarioSenha" type="password" placeholder="Nova senha (opcional na edição)" />
+            <label class="field-label">Ativo</label>
+            <select id="usuarioAtivo">
+              <option value="1">Ativo</option>
+              <option value="0">Inativo</option>
+            </select>
+            <div style="margin-top:10px;display:flex;gap:8px;">
+              <button id="btnSalvarUsuario" class="btn btn-primary" type="button">Salvar</button>
+              <button id="btnCancelarUsuario" class="btn btn-secondary btn-soft" type="button" style="display:none;">Cancelar</button>
+            </div>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section id="caixa" class="tab-content hidden">
+      <div class="two-column-layout">
+        <div class="main-content">
+          <h2>Caixa</h2>
+          <div class="main-content-scroll">
+            <div id="caixaResumoCards" class="card-grid"></div>
+            <h3 style="margin:16px 0 8px;font-size:14px;">Histórico recente</h3>
+            <table class="table">
+              <thead>
+                <tr><th>Data</th><th>Status</th><th>Total</th><th>Usuário</th></tr>
+              </thead>
+              <tbody id="caixaHistoricoBody"></tbody>
+            </table>
+          </div>
+        </div>
+        <aside class="sidebar">
+          <div class="sidebar-section">
+            <h3>Caixa atual</h3>
+            <div id="caixaAtualInfo" style="font-size:12px;color:#64748b;">Carregando...</div>
+          </div>
+        </aside>
+      </div>
+    </section>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/common.js"></script>
+  <script src="js/auth-guard.js"></script>
+  <script src="js/gerente.js"></script>
+</body>
+</html>

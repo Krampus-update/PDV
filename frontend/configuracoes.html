@@ -6,9 +6,21 @@
   <title>PDV - Configurações</title>
   <link rel="stylesheet" href="css/global.css">
   <style>
-    .cfg-wrap { padding: 18px; display: grid; grid-template-columns: 1fr 1.3fr; gap: 18px; }
+    .cfg-wrap {
+      padding: 18px;
+      display: grid;
+      grid-template-columns: 1fr 1.3fr;
+      gap: 18px;
+    }
     .cfg-actions { display:flex; gap:8px; flex-wrap: wrap; }
     .printer-grid { display:grid; grid-template-columns: 1fr 120px; gap:8px; }
+
+    .card {
+      border-radius: 20px;
+      box-shadow: var(--shadow);
+      border: 1px solid rgba(226, 232, 240, 0.9);
+      background: rgba(255, 255, 255, 0.92);
+    }
 
     .users-topbar { display:flex; gap:8px; margin-bottom:10px; }
     .users-topbar input { flex:1; }
@@ -17,10 +29,10 @@
 
     .user-item {
       border: 1px solid #dbe3ef;
-      border-radius: 12px;
+      border-radius: 16px;
       padding: 12px;
       background: linear-gradient(180deg, #ffffff, #f8fbff);
-      box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
+      box-shadow: var(--shadow);
     }
 
     .user-head { display:flex; justify-content:space-between; align-items:center; gap:10px; }
@@ -107,6 +119,14 @@
 
       <hr style="margin:14px 0;border:none;border-top:1px solid #e2e8f0;">
       <h3 style="margin:0 0 8px 0">Impressora térmica</h3>
+      <div class="form-group">
+        <label for="impDestino">Destino da impressora</label>
+        <select id="impDestino"></select>
+        <div class="printer-grid" style="margin-top:8px">
+          <input id="impNovoDestino" type="text" placeholder="Novo destino (ex.: caixa, bar, delivery)">
+          <button id="btnNovoDestino" class="btn btn-secondary" type="button">Criar</button>
+        </div>
+      </div>
       <label style="font-size:12px;display:flex;align-items:center;gap:6px;margin-bottom:8px">
         <input id="impHabilitada" type="checkbox"> Habilitar impressão
       </label>
@@ -137,6 +157,7 @@
         <button id="btnSalvarImpressora" class="btn btn-primary">Salvar impressora</button>
         <button id="btnListarImpressoras" class="btn btn-secondary">Listar locais</button>
         <button id="btnTesteImpressora" class="btn btn-secondary">Imprimir teste</button>
+        <button id="btnExcluirDestino" class="btn btn-danger">Excluir destino</button>
       </div>
       <div class="form-group" style="margin-top:10px;">
         <label>O que imprimir automaticamente</label>
@@ -148,6 +169,37 @@
         </label>
       </div>
       <small id="impStatus" style="display:block;margin-top:8px;color:#64748b"></small>
+
+      <hr style="margin:14px 0;border:none;border-top:1px solid #e2e8f0;">
+      <h3 style="margin:0 0 8px 0">PIX</h3>
+      <label style="font-size:12px;display:flex;align-items:center;gap:6px;margin-bottom:8px">
+        <input id="pixHabilitado" type="checkbox"> Habilitar Pix
+      </label>
+      <div class="form-group">
+        <label for="pixChave">Chave Pix</label>
+        <input id="pixChave" type="text" placeholder="email, telefone, EVP...">
+      </div>
+      <div class="form-group">
+        <label for="pixNomeRecebedor">Nome recebedor</label>
+        <input id="pixNomeRecebedor" type="text" placeholder="Nome do estabelecimento">
+      </div>
+      <div class="form-group">
+        <label for="pixCidade">Cidade</label>
+        <input id="pixCidade" type="text" placeholder="SAO PAULO">
+      </div>
+      <div class="form-group">
+        <label for="pixDescricaoPadrao">Descrição padrão</label>
+        <input id="pixDescricaoPadrao" type="text" placeholder="Pagamento PDV">
+      </div>
+      <div class="form-group">
+        <label for="pixQrArquivo">QR code do Pix (upload)</label>
+        <input id="pixQrArquivo" type="file" accept="image/*">
+        <img id="pixQrPreview" alt="Prévia do QR Pix" style="display:none;margin-top:8px;max-width:180px;border:1px solid #dbe3ef;border-radius:14px;padding:6px;background:#fff">
+      </div>
+      <div class="cfg-actions">
+        <button id="btnSalvarPix" class="btn btn-primary">Salvar PIX</button>
+      </div>
+      <small id="pixStatus" style="display:block;margin-top:8px;color:#64748b"></small>
     </section>
 
     <section class="card">

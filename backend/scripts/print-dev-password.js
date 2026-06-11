@@ -1,10 +1,10 @@
-import { DEV_LOGIN, getDevPassword } from '../src/services/devAccessService.js';
+import { DEV_LOGIN, resetDevPassword } from '../src/services/devAccessService.js';
 
-const senha = await getDevPassword();
+const { password } = await resetDevPassword();
 
 console.log('====================================');
-console.log('Acesso DEV PDV');
+console.log('Senha DEV PDV redefinida');
 console.log(`Login: ${DEV_LOGIN}`);
-console.log(`Senha: ${senha}`);
+console.log(`Senha nova: ${password}`);
 console.log('====================================');
-console.log('Use esse login na tela de acesso junto com o código do restaurante.');
+console.log('Guarde essa senha agora. Ela nao fica salva em texto puro.');

@@ -34,7 +34,10 @@
         <div class="pdv-notif-card">
           <div class="pdv-notif-head">
             <h3>Avisos</h3>
-            <button type="button" id="pdvNotifClose" class="pdv-icon-btn">x</button>
+            <div style="display:flex;gap:6px;align-items:center">
+              <button type="button" id="pdvNotifClear" class="btn btn-secondary btn-soft" style="padding:4px 8px;font-size:11px">Limpar</button>
+              <button type="button" id="pdvNotifClose" class="pdv-icon-btn">x</button>
+            </div>
           </div>
           <div id="pdvNotifList" class="pdv-notif-list"></div>
         </div>
@@ -42,6 +45,11 @@
     `;
     document.body.appendChild(root);
     root.querySelector('#pdvNotifClose')?.addEventListener('click', ()=>toggleNotifCenter(false));
+    root.querySelector('#pdvNotifClear')?.addEventListener('click', ()=>{
+      saveNotifs([]);
+      renderNotifCenter();
+      updateNotifBadge();
+    });
     root.querySelector('#pdvNotifCenter')?.addEventListener('click', (e)=>{
       if(e.target?.id === 'pdvNotifCenter') toggleNotifCenter(false);
     });
@@ -198,46 +206,248 @@
     });
   }
 
-  function uiChoose({title='Selecione', message='', items=[], okLabel='Selecionar', cancelLabel='Cancelar', allowNull=true}){
-    return new Promise((resolve)=>{
-      const listHtml = items.map((it, idx)=>
-        `<label class="pdv-choice-item">
-           <input type="radio" name="pdvChoice" value="${idx}">
-           <span><strong>${it.label}</strong>${it.meta ? `<small>${it.meta}</small>` : ''}</span>
-         </label>`
-      ).join('');
+  function uiPixPayment({
+    title = 'Pagamento PIX',
+    message = 'Mostre o QR code para o cliente e copie a chave abaixo se necessário.',
+    qrDataUrl = '',
+    payload = '',
+    chave = ''
+  } = {}) {
+    return new Promise((resolve) => {
+      const payloadId = `pdvPixPayload_${Date.now()}`;
+      const chaveId = `pdvPixChave_${Date.now()}`;
+      const escapeHtml = (value) =>
+        String(value ?? '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+      const qrHtml = qrDataUrl
+        ? `<img src="${String(qrDataUrl).replace(/"/g, '&quot;')}" alt="QR Code PIX" class="pdv-pix-qr">`
+        : '<div class="pdv-pix-qr-placeholder">QR indisponível</div>';
       const backdrop = dialogBase({
         title,
         message,
-        bodyHtml: `<div class="pdv-choice-list">${listHtml || '<p class="pdv-notif-empty">Nenhuma opção disponível.</p>'}</div>`,
+        bodyHtml: `
+          <div class="pdv-pix-panel">
+            ${qrHtml}
+            <div class="pdv-pix-details">
+              <div class="pdv-pix-field">
+                <label for="${chaveId}">Chave PIX</label>
+                <input id="${chaveId}" class="input-field" type="text" readonly value="${escapeHtml(chave)}">
+              </div>
+              <div class="pdv-pix-field">
+                <label for="${payloadId}">Copia e cola</label>
+                <textarea id="${payloadId}" class="input-field pdv-pix-payload" rows="4" readonly>${escapeHtml(payload)}</textarea>
+              </div>
+              <button type="button" class="btn btn-secondary" data-action="copy">Copiar código</button>
+            </div>
+          </div>
+        `,
+        okLabel: 'Fechar',
+        showCancel: false
+      });
+      if (!backdrop) return resolve();
+
+      const payloadEl = backdrop.querySelector(`#${payloadId}`);
+      const copyBtn = backdrop.querySelector('[data-action="copy"]');
+      const done = () => {
+        closeDialog();
+        resolve();
+      };
+
+      copyBtn?.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(payloadEl?.value || payload || '');
+          copyBtn.textContent = 'Copiado';
+          setTimeout(() => {
+            if (copyBtn.isConnected) copyBtn.textContent = 'Copiar código';
+          }, 1200);
+        } catch {
+          try {
+            payloadEl?.select?.();
+            document.execCommand('copy');
+            copyBtn.textContent = 'Copiado';
+          } catch {
+            pushNotif({ title: 'PIX', message: 'Não foi possível copiar automaticamente.', type: 'warning', keepHistory: true });
+          }
+        }
+      });
+
+      backdrop.addEventListener('click', (e) => {
+        if (e.target === backdrop || e.target?.dataset?.action === 'ok') done();
+      });
+    });
+  }
+
+  function uiChoose(opts = {}) {
+    return uiSearchChoose(opts);
+  }
+
+  function uiSearchChoose({
+    title = 'Selecione',
+    message = '',
+    items = [],
+    okLabel = 'Selecionar',
+    cancelLabel = 'Cancelar',
+    searchPlaceholder = 'Buscar...',
+    allowNull = true
+  } = {}) {
+    return new Promise((resolve) => {
+      const inputId = `pdvSearchInput_${Date.now()}`;
+      const listId = `pdvSearchList_${Date.now()}`;
+      const backdrop = dialogBase({
+        title,
+        message,
+        bodyHtml: `
+          <input id="${inputId}" class="input-field pdv-search-input" type="search" placeholder="${searchPlaceholder}" />
+          <div id="${listId}" class="pdv-search-list" role="listbox" aria-label="${title}"></div>
+        `,
         okLabel,
         cancelLabel,
         showCancel: true
       });
-      if(!backdrop) return resolve(null);
-      const first = backdrop.querySelector('input[name="pdvChoice"]');
-      if(first) first.checked = true;
+      if (!backdrop) return resolve(null);
 
-      backdrop.addEventListener('click', (e)=>{
-        if(e.target === backdrop || e.target?.dataset?.action === 'cancel'){
-          closeDialog();
-          resolve(null);
+      const input = backdrop.querySelector(`#${inputId}`);
+      const list = backdrop.querySelector(`#${listId}`);
+      let filtered = Array.isArray(items) ? items.slice() : [];
+      let selectedIdx = filtered.length ? 0 : -1;
+
+      const escapeHtml = (value) =>
+        String(value ?? '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
+
+      const itemMatches = (item, term) => {
+        if (!term) return true;
+        const label = String(item?.label || '').toLowerCase();
+        const meta = String(item?.meta || '').toLowerCase();
+        const value = String(item?.value ?? '').toLowerCase();
+        return label.includes(term) || meta.includes(term) || value.includes(term);
+      };
+
+      const firstEnabledIndex = () => filtered.findIndex((item) => !item?.disabled);
+
+      const moveSelection = (direction) => {
+        if (!filtered.length) {
+          selectedIdx = -1;
+          return;
         }
-        if(e.target?.dataset?.action === 'ok'){
-          const selected = backdrop.querySelector('input[name="pdvChoice"]:checked');
-          if(!selected){
-            if(allowNull){
-              closeDialog();
-              return resolve(null);
-            }
+        let idx = selectedIdx;
+        for (let i = 0; i < filtered.length; i += 1) {
+          idx += direction;
+          if (idx < 0) idx = filtered.length - 1;
+          if (idx >= filtered.length) idx = 0;
+          if (!filtered[idx]?.disabled) {
+            selectedIdx = idx;
             return;
           }
-          const idx = Number(selected.value);
-          const item = items[idx] || null;
-          closeDialog();
-          resolve(item ? item.value : null);
+        }
+        selectedIdx = firstEnabledIndex();
+      };
+
+      const render = () => {
+        const term = String(input?.value || '').toLowerCase().trim();
+        filtered = items.filter((item) => itemMatches(item, term));
+        if (
+          selectedIdx >= filtered.length ||
+          selectedIdx < 0 ||
+          filtered[selectedIdx]?.disabled
+        ) {
+          selectedIdx = firstEnabledIndex();
+        }
+        if (!list) return;
+        if (!filtered.length) {
+          list.innerHTML = '<p class="pdv-search-empty">Nenhuma opção encontrada.</p>';
+          return;
+        }
+        list.innerHTML = filtered
+          .map(
+            (item, idx) => `
+              <button
+                type="button"
+                class="pdv-search-item ${idx === selectedIdx ? 'selected' : ''} ${item.disabled ? 'disabled' : ''}"
+                data-idx="${idx}"
+                role="option"
+                aria-selected="${idx === selectedIdx ? 'true' : 'false'}"
+                ${item.disabled ? 'aria-disabled="true" disabled' : ''}
+              >
+                <span class="pdv-search-item-main">${escapeHtml(item.label || '')}</span>
+                ${item.meta ? `<span class="pdv-search-item-meta">${escapeHtml(item.meta)}</span>` : ''}
+              </button>
+            `
+          )
+          .join('');
+      };
+
+      const closeAndResolve = (value) => {
+        closeDialog();
+        resolve(value);
+      };
+
+      const selectCurrent = () => {
+        if (selectedIdx < 0 || selectedIdx >= filtered.length) {
+          return allowNull ? closeAndResolve(null) : null;
+        }
+        const item = filtered[selectedIdx];
+        if (item?.disabled) return false;
+        closeAndResolve(item ? item.value : null);
+        return true;
+      };
+
+      input?.addEventListener('input', () => {
+        selectedIdx = 0;
+        render();
+      });
+
+      input?.addEventListener('keydown', (e) => {
+        if (e.key === 'ArrowDown') {
+          e.preventDefault();
+          moveSelection(1);
+          render();
+        }
+        if (e.key === 'ArrowUp') {
+          e.preventDefault();
+          moveSelection(-1);
+          render();
+        }
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          selectCurrent();
+        }
+        if (e.key === 'Escape') {
+          closeAndResolve(null);
         }
       });
+
+      backdrop.addEventListener('click', (e) => {
+        const item = e.target?.closest?.('.pdv-search-item');
+        if (item && list?.contains(item)) {
+          const idx = Number(item.dataset.idx);
+          if (Number.isFinite(idx)) {
+            selectedIdx = idx;
+            render();
+            if (filtered[idx]?.disabled) return;
+            if (e.detail > 1) selectCurrent();
+          }
+          return;
+        }
+        if (e.target === backdrop || e.target?.dataset?.action === 'cancel') {
+          closeAndResolve(undefined);
+          return;
+        }
+        if (e.target?.dataset?.action === 'ok') {
+          selectCurrent();
+        }
+      });
+
+      setTimeout(() => input?.focus(), 30);
+      render();
     });
   }
 
@@ -271,15 +481,38 @@
     const max = 6;
     const teclas = ['7','8','9','4','5','6','1','2','3','0',','];
     let buffer = '';
+    let active = false;
+    const api = {
+      clear(){ buffer=''; update(); },
+      getValue(){ return converterBufferParaValor(buffer); },
+      setValue(v){
+        const n = Number(String(v).replace(',', '.'));
+        if(isNaN(n) || n < 0){
+          buffer = '';
+          update();
+          return;
+        }
+        buffer = String(Math.round(n * 100));
+        update();
+      },
+      container
+    };
+    const setActive = () => {
+      active = true;
+      window.__pdvActiveTeclado = api;
+    };
     const update = ()=>{ if(display) display.textContent = formatarMoedaBR(converterBufferParaValor(buffer)||0); };
     container.innerHTML = '';
+    container.addEventListener('pointerdown', setActive);
     teclas.forEach(k=>{
       const btn = document.createElement('button');
       btn.className = 'pad-key' + (k === ',' ? ' secondary' : '');
       btn.style.fontSize = '14px';
       btn.textContent = k;
+      btn.addEventListener('pointerdown', setActive);
       btn.addEventListener('click', (e)=>{
         e.preventDefault();
+        setActive();
         if(k === ','){
           if(buffer.includes(',')) return;
           buffer += k;
@@ -295,30 +528,67 @@
     btnBackspace.className = 'pad-key secondary';
     btnBackspace.style.fontSize = '14px';
     btnBackspace.textContent = '⌫';
+    btnBackspace.addEventListener('pointerdown', setActive);
     btnBackspace.addEventListener('click', (e)=>{
       e.preventDefault();
+      setActive();
       if(buffer.length > 0){
         buffer = buffer.slice(0, -1);
         update();
       }
     });
     container.appendChild(btnBackspace);
-    return {
-      clear(){ buffer=''; update(); },
-      getValue(){ return converterBufferParaValor(buffer); },
-      setValue(v){
-        const n = Number(String(v).replace(',', '.'));
-        if(isNaN(n) || n < 0){
-          buffer = '';
-          update();
+    if(!window.__pdvKeyboardListenerInstalled){
+      window.__pdvKeyboardListenerInstalled = true;
+      document.addEventListener('keydown', (e) => {
+        const teclado = window.__pdvActiveTeclado;
+        if(!teclado || !teclado.container || !teclado.container.isConnected) return;
+        const target = e.target;
+        const tag = target && target.tagName ? target.tagName.toLowerCase() : '';
+        if(tag === 'input' || tag === 'textarea' || target?.isContentEditable) return;
+        const key = e.key;
+        if(/^[0-9]$/.test(key)) {
+          e.preventDefault();
+          teclado.container.querySelector(`.pad-key:not(.secondary):not([disabled])`)?.focus?.();
+          if (typeof teclado._pushDigit === 'function') teclado._pushDigit(key);
           return;
         }
-        // Mantem consistencia do teclado: buffer sem separador = centavos.
-        buffer = String(Math.round(n * 100));
+        if(key === ',' || key === '.') {
+          e.preventDefault();
+          if (typeof teclado._pushComma === 'function') teclado._pushComma();
+          return;
+        }
+        if(key === 'Backspace') {
+          e.preventDefault();
+          if (typeof teclado._backspace === 'function') teclado._backspace();
+          return;
+        }
+        if(key === 'Escape') {
+          if (typeof teclado.clear === 'function') teclado.clear();
+        }
+      });
+    }
+    api._pushDigit = (digit) => {
+      if (buffer.length < max) {
+        buffer += String(digit);
         update();
-      },
-      container
+      }
     };
+    api._pushComma = () => {
+      if (!buffer.includes(',')) {
+        buffer += ',';
+        update();
+      }
+    };
+    api._backspace = () => {
+      if (buffer.length > 0) {
+        buffer = buffer.slice(0, -1);
+        update();
+      }
+    };
+    container.querySelectorAll('.pad-key').forEach((btn) => btn.addEventListener('focus', setActive));
+    update();
+    return api;
   }
 
   function initRealtime(onMessage){
@@ -388,6 +658,7 @@
     const role = String(user.role || '').toLowerCase();
     const canManage = role === 'gerente' || role === 'dev';
     const canAdmin = role === 'gerente' || role === 'dev';
+    const isDev = role === 'dev';
 
     const operacaoLinks = [
       '<a href="painel.html">Painel</a>',
@@ -396,6 +667,8 @@
     ].join('');
 
     const gestaoLinks = [
+      canManage ? '<a href="gerente.html">Gerente</a>' : '',
+      isDev ? '<a href="dev.html">Dev</a>' : '',
       canAdmin ? '<a href="admin.html">Admin</a>' : '',
       canManage ? '<button type="button" data-action="open-config">Configurações</button>' : ''
     ].filter(Boolean).join('');
@@ -467,7 +740,9 @@
     alert: uiAlert,
     confirm: uiConfirm,
     prompt: uiPrompt,
+    pixPayment: uiPixPayment,
     choose: uiChoose,
+    searchChoose: uiSearchChoose,
     openNotificationCenter: () => toggleNotifCenter(true)
   };
 
@@ -475,5 +750,32 @@
     document.addEventListener('DOMContentLoaded', initTopbarContext);
   }else{
     initTopbarContext();
+  }
+
+  async function cleanupServiceWorkers(){
+    if(!('serviceWorker' in navigator)) return;
+    try{
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map((reg) => reg.unregister()));
+    }catch{}
+    try{
+      const keys = await caches.keys();
+      await Promise.all(keys.map((key) => caches.delete(key)));
+    }catch{}
+  }
+
+  function manageServiceWorker(){
+    if(!('serviceWorker' in navigator)) return;
+    const isLocalDev = ['localhost', '127.0.0.1'].includes(window.location.hostname);
+    if(isLocalDev){
+      cleanupServiceWorkers().catch(()=>null);
+      return;
+    }
+    navigator.serviceWorker.register('/sw.js').catch(()=>null);
+  }
+  if(document.readyState === 'loading'){
+    window.addEventListener('load', manageServiceWorker);
+  }else{
+    manageServiceWorker();
   }
 })();

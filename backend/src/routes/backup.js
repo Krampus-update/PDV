@@ -7,5 +7,6 @@ const router = express.Router();
 router.use(authOptional, authRequired, requireRole('gerente'));
 router.get('/', BackupController.listar);
 router.post('/executar', BackupController.executar);
+router.delete('/', BackupController.remover);
 
 export default router;

@@ -39,13 +39,29 @@ async function listarBackups() {
   return stats.sort((a, b) => b.updated_at.localeCompare(a.updated_at));
 }
 
+async function excluirBackup(caminho) {
+  if (!caminho) throw new Error('Arquivo de backup inválido');
+  const full = path.resolve(String(caminho));
+  const base = path.resolve(backupDir);
+  if (!full.startsWith(base)) {
+    throw new Error('Backup fora do diretório permitido');
+  }
+  await fs.unlink(full);
+  return full;
+}
+
+async function limparBackupsAntigos(manter = 40) {
+  const backups = await listarBackups();
+  const excess = backups.slice(Math.max(0, Number(manter) || 0));
+  await Promise.all(excess.map((b) => fs.unlink(b.caminho).catch(() => null)));
+  return excess.map((b) => b.arquivo);
+}
+
 function iniciarAutoBackup({ intervalMs = 6 * 60 * 60 * 1000, manter = 40 } = {}) {
   const timer = setInterval(async () => {
     try {
       await criarBackupManual();
-      const backups = await listarBackups();
-      const excess = backups.slice(manter);
-      await Promise.all(excess.map((b) => fs.unlink(b.caminho).catch(() => null)));
+      await limparBackupsAntigos(manter);
       console.log(`✓ Auto-backup executado (${new Date().toISOString()})`);
     } catch (e) {
       console.warn('Falha no auto-backup:', e.message);
@@ -54,4 +70,4 @@ function iniciarAutoBackup({ intervalMs = 6 * 60 * 60 * 1000, manter = 40 } = {}
   return timer;
 }
 
-export { criarBackupManual, listarBackups, iniciarAutoBackup };
+export { criarBackupManual, listarBackups, excluirBackup, limparBackupsAntigos, iniciarAutoBackup };

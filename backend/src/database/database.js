@@ -1,12 +1,15 @@
 import sqlite3 from 'sqlite3';
 import path from 'path';
 import fs from 'fs/promises';
+import { existsSync } from 'fs';
 import { AsyncLocalStorage } from 'async_hooks';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const tenantsDir = path.join(__dirname, '../../tenants');
-const centralDbPath = path.join(__dirname, '../../central.db');
+const isTestMode = String(process.env.NODE_ENV || process.env.PDV_DB_MODE || '').toLowerCase() === 'test';
+const dataRootDir = path.join(__dirname, '../../', isTestMode ? 'test-data' : '.');
+const tenantsDir = isTestMode ? path.join(dataRootDir, 'tenants') : path.join(__dirname, '../../tenants');
+const centralDbPath = isTestMode ? path.join(dataRootDir, 'central.db') : path.join(__dirname, '../../central.db');
 
 const tenantStorage = new AsyncLocalStorage();
 const tenantConnections = new Map();
@@ -97,6 +100,7 @@ async function initializeCentralDatabase() {
 }
 
 async function tenantExists(code) {
+  await initializeCentralDatabase();
   const db = await getCentralDatabase();
   const tenant = sanitizeTenantCode(code);
   const row = await new Promise((resolve, reject) => {
@@ -109,6 +113,7 @@ async function tenantExists(code) {
 }
 
 async function registerTenant({ code, nome }) {
+  await initializeCentralDatabase();
   const db = await getCentralDatabase();
   const tenant = sanitizeTenantCode(code);
   const exists = await tenantExists(tenant);
@@ -117,7 +122,26 @@ async function registerTenant({ code, nome }) {
   return tenant;
 }
 
+async function deleteTenant(code) {
+  await initializeCentralDatabase();
+  const tenant = sanitizeTenantCode(code);
+  if (tenant === 'default') {
+    throw new Error('O tenant default não pode ser removido');
+  }
+  await closeTenantDatabase(tenant).catch(() => null);
+  const db = await getCentralDatabase();
+  await runQuery(db, 'DELETE FROM tenants WHERE code = ?', [tenant]);
+  const files = [getTenantDbPath(tenant), `${getTenantDbPath(tenant)}-wal`, `${getTenantDbPath(tenant)}-shm`, `${getTenantDbPath(tenant)}-journal`];
+  for (const file of files) {
+    if (existsSync(file)) {
+      await fs.unlink(file).catch(() => null);
+    }
+  }
+  return tenant;
+}
+
 async function listTenants() {
+  await initializeCentralDatabase();
   const db = await getCentralDatabase();
   return new Promise((resolve, reject) => {
     db.all('SELECT id, code, nome, ativo, created_at FROM tenants ORDER BY nome', [], (err, rows) => {
@@ -228,6 +252,13 @@ function tenantSchemaQueries() {
       created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
       updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
     )`,
+    `CREATE TABLE IF NOT EXISTS categorias (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nome TEXT NOT NULL UNIQUE,
+      ativo BOOLEAN DEFAULT 1,
+      vai_cozinha BOOLEAN DEFAULT 0,
+      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+    )`,
     `CREATE TABLE IF NOT EXISTS usuarios (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       nome TEXT NOT NULL,
@@ -256,9 +287,13 @@ function tenantSchemaQueries() {
       descricao TEXT,
       tipo TEXT NOT NULL DEFAULT 'combo_produto',
       produto_id INTEGER,
+<<<<<<< HEAD
       variacao_nome TEXT,
       produto_bonus_id INTEGER,
       produto_bonus_quantidade INTEGER NOT NULL DEFAULT 1,
+=======
+      categoria TEXT,
+>>>>>>> de082d523ba64c5da2e1d8b0a8a008b9018ee045
       quantidade_min INTEGER NOT NULL DEFAULT 0,
       repetir_na_venda BOOLEAN DEFAULT 1,
       preco_combo DECIMAL(10,2),
@@ -425,6 +460,7 @@ async function initializeTenantDatabase(code) {
   if (!promoCols.some((c) => c.name === 'repetir_na_venda')) {
     await runQuery(db, 'ALTER TABLE promocoes ADD COLUMN repetir_na_venda BOOLEAN DEFAULT 1');
   }
+<<<<<<< HEAD
   if (!promoCols.some((c) => c.name === 'variacao_nome')) {
     await runQuery(db, 'ALTER TABLE promocoes ADD COLUMN variacao_nome TEXT');
   }
@@ -433,6 +469,10 @@ async function initializeTenantDatabase(code) {
   }
   if (!promoCols.some((c) => c.name === 'produto_bonus_quantidade')) {
     await runQuery(db, 'ALTER TABLE promocoes ADD COLUMN produto_bonus_quantidade INTEGER NOT NULL DEFAULT 1');
+=======
+  if (!promoCols.some((c) => c.name === 'categoria')) {
+    await runQuery(db, 'ALTER TABLE promocoes ADD COLUMN categoria TEXT');
+>>>>>>> de082d523ba64c5da2e1d8b0a8a008b9018ee045
   }
   const prodCols = await dbAll("PRAGMA table_info(produtos)", [], code);
   const vendaItemCols = await dbAll("PRAGMA table_info(venda_itens)", [], code);
@@ -463,6 +503,22 @@ async function initializeTenantDatabase(code) {
   if (!prodCols.some((c) => c.name === 'promocao_param_json')) {
     await runQuery(db, 'ALTER TABLE produtos ADD COLUMN promocao_param_json TEXT');
   }
+  const catCols = await dbAll("PRAGMA table_info(categorias)", [], code).catch(() => []);
+  if (!catCols || !Array.isArray(catCols) || catCols.length === 0) {
+    await runQuery(
+      db,
+      `CREATE TABLE IF NOT EXISTS categorias (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nome TEXT NOT NULL UNIQUE,
+        ativo BOOLEAN DEFAULT 1,
+        vai_cozinha BOOLEAN DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      )`
+    );
+  }
+  if (catCols && Array.isArray(catCols) && !catCols.some((c) => c.name === 'vai_cozinha')) {
+    await runQuery(db, 'ALTER TABLE categorias ADD COLUMN vai_cozinha BOOLEAN DEFAULT 0');
+  }
 
   const indexQueries = [
     'CREATE INDEX IF NOT EXISTS idx_vendas_tipo ON vendas(tipo)',
@@ -477,13 +533,15 @@ async function initializeTenantDatabase(code) {
     'CREATE INDEX IF NOT EXISTS idx_historico_created_at ON historico_transacoes(created_at)',
     'CREATE INDEX IF NOT EXISTS idx_clientes_nome ON clientes(nome)',
     'CREATE INDEX IF NOT EXISTS idx_clientes_telefone ON clientes(telefone)',
+    'CREATE INDEX IF NOT EXISTS idx_categorias_nome ON categorias(nome)',
     'CREATE INDEX IF NOT EXISTS idx_usuarios_login ON usuarios(login)',
     'CREATE INDEX IF NOT EXISTS idx_sessoes_token ON sessoes(token)',
     'CREATE INDEX IF NOT EXISTS idx_sessoes_expires ON sessoes(expires_at)',
     'CREATE INDEX IF NOT EXISTS idx_caixa_aberto_em ON caixa_sessoes(aberto_em)',
     'CREATE INDEX IF NOT EXISTS idx_caixa_fechado_em ON caixa_sessoes(fechado_em)',
     'CREATE INDEX IF NOT EXISTS idx_promocoes_ativo ON promocoes(ativo)',
-    'CREATE INDEX IF NOT EXISTS idx_promocoes_produto_id ON promocoes(produto_id)'
+    'CREATE INDEX IF NOT EXISTS idx_promocoes_produto_id ON promocoes(produto_id)',
+    'CREATE INDEX IF NOT EXISTS idx_promocoes_categoria ON promocoes(categoria)'
   ];
   for (const query of indexQueries) await runQuery(db, query);
 
@@ -520,6 +578,24 @@ async function initializeTenantDatabase(code) {
       }
     }
     await runQuery(db, 'UPDATE schema_version SET seed_data_inserted = 1');
+  }
+
+  // Seed categorias padrão (se não existir nenhuma)
+  const categoriasExistentes = await dbAll('SELECT nome FROM categorias', [], code).catch(() => []);
+  if (!categoriasExistentes || categoriasExistentes.length === 0) {
+    const categorias = new Set(['bebidas', 'comidas', 'sobremesas', 'geral']);
+    const catsProdutos = await dbAll('SELECT DISTINCT categoria FROM produtos WHERE categoria IS NOT NULL', [], code).catch(() => []);
+    for (const row of catsProdutos || []) {
+      const nome = String(row.categoria || '').trim().toLowerCase();
+      if (nome) categorias.add(nome);
+    }
+    for (const nome of categorias) {
+      try {
+        await runQuery(db, 'INSERT INTO categorias (nome, ativo) VALUES (?, 1)', [nome]);
+      } catch {
+        // ignore duplicates
+      }
+    }
   }
 }
 
@@ -563,10 +639,22 @@ async function dbAll(query, params = [], tenantCode = null) {
   });
 }
 
+async function closeTenantDatabase(tenantCode = getCurrentTenantCode()) {
+  const tenant = sanitizeTenantCode(tenantCode);
+  const db = tenantConnections.get(tenant);
+  if (!db) return false;
+  await new Promise((resolve) => {
+    db.close(() => resolve());
+  });
+  tenantConnections.delete(tenant);
+  return true;
+}
+
 export {
   initializeDatabase,
   initializeTenantDatabase,
   registerTenant,
+  deleteTenant,
   tenantExists,
   listTenants,
   runWithTenant,
@@ -574,5 +662,6 @@ export {
   sanitizeTenantCode,
   dbRun,
   dbGet,
-  dbAll
+  dbAll,
+  closeTenantDatabase
 };

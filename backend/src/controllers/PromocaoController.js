@@ -30,9 +30,13 @@ class PromocaoController {
         nome,
         tipo = 'combo_produto',
         produto_id,
+<<<<<<< HEAD
         variacao_nome,
         produto_bonus_id,
         produto_bonus_quantidade = 1,
+=======
+        categoria,
+>>>>>>> de082d523ba64c5da2e1d8b0a8a008b9018ee045
         quantidade_min = 0,
         repetir_na_venda = true,
         preco_combo,
@@ -48,9 +52,13 @@ class PromocaoController {
         nome,
         tipo,
         produto_id: produto_id || null,
+<<<<<<< HEAD
         variacao_nome: String(variacao_nome || '').trim() || null,
         produto_bonus_id: produto_bonus_id || null,
         produto_bonus_quantidade: Math.max(1, Number(produto_bonus_quantidade || 1)),
+=======
+        categoria: categoria || null,
+>>>>>>> de082d523ba64c5da2e1d8b0a8a008b9018ee045
         quantidade_min,
         repetir_na_venda: !!repetir_na_venda,
         preco_combo,

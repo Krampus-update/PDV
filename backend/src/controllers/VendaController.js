@@ -1,5 +1,6 @@
 import VendaModel from '../models/VendaModel.js';
 import VendaItemModel from '../models/VendaItemModel.js';
+import CategoriaModel from '../models/CategoriaModel.js';
 import ProdutoModel from '../models/ProdutoModel.js';
 import PromocaoModel from '../models/PromocaoModel.js';
 import HistoricoModel from '../models/HistoricoModel.js';
@@ -18,6 +19,47 @@ function isAvulso(produto){
   return (produto.nome && produto.nome.startsWith('Avulso')) || produto.estoque >= 9999;
 }
 
+function normalizarTexto(v) {
+  return String(v || '').trim().toLowerCase();
+}
+
+function parseOpcoesProduto(produto) {
+  try {
+    const arr = JSON.parse(produto?.opcoes_json || '[]');
+    if (!Array.isArray(arr)) return [];
+    return arr
+      .map((o) => ({
+        nome: String(o?.nome || '').trim(),
+        extra: Number(o?.extra || 0) || 0,
+        consumo: Math.max(1, Number(o?.consumo || 1)),
+        estoque: o?.estoque === null || o?.estoque === undefined || o?.estoque === '' ? null : Math.max(0, Number(o?.estoque) || 0)
+      }))
+      .filter((o) => o.nome);
+  } catch {
+    return [];
+  }
+}
+
+function acharOpcaoProduto(produto, observacoes) {
+  const obs = normalizarTexto(observacoes);
+  if (!obs) return null;
+  return parseOpcoesProduto(produto).find((o) => normalizarTexto(o.nome) === obs) || null;
+}
+
+async function ajustarEstoqueOpcaoProduto(produtoId, nomeOpcao, delta) {
+  if (!nomeOpcao) return;
+  const produto = await ProdutoModel.obterPorId(produtoId);
+  if (!produto) return;
+  const opcoes = parseOpcoesProduto(produto);
+  const idx = opcoes.findIndex((o) => normalizarTexto(o.nome) === normalizarTexto(nomeOpcao));
+  if (idx < 0) return;
+  const atual = opcoes[idx];
+  if (atual.estoque === null || atual.estoque === undefined) return;
+  const novo = Math.max(0, Number(atual.estoque || 0) + Number(delta || 0));
+  opcoes[idx] = { ...atual, estoque: novo };
+  await ProdutoModel.atualizar(produtoId, { opcoes_json: JSON.stringify(opcoes) });
+}
+
 async function registrarHistorico(acao, entidade_id, detalhes = null) {
   try {
     await HistoricoModel.registrar({
@@ -29,6 +71,13 @@ async function registrarHistorico(acao, entidade_id, detalhes = null) {
   } catch (e) {
     console.warn('Falha ao registrar histórico de venda:', e.message);
   }
+}
+
+async function produtoVaiParaCozinha(produto) {
+  if (!produto) return false;
+  if (Number(produto.vai_cozinha) === 1) return true;
+  const categoria = await CategoriaModel.obterPorNome(produto.categoria);
+  return Number(categoria?.vai_cozinha || 0) === 1;
 }
 
 async function tentarImpressaoAutomatica({ vendaId, tipo, flag }) {
@@ -55,6 +104,11 @@ class VendaController {
     if (promo.data_inicio && new Date(promo.data_inicio).getTime() > now) return false;
     if (promo.data_fim && new Date(promo.data_fim).getTime() < now) return false;
     return true;
+  }
+
+  static normalizarCategoria(valor) {
+    const v = String(valor || '').trim().toLowerCase();
+    return v || 'geral';
   }
 
   static calcularDesconto({ venda, itens, desconto_tipo, desconto_valor }) {
@@ -108,6 +162,29 @@ class VendaController {
       if (qtd < packQtd || comboPrice <= 0) return { desconto: 0, promocao: promo };
       const aplicarRepetidamente = Number(promo.repetir_na_venda ?? 1) === 1;
       const groups = aplicarRepetidamente ? Math.floor(qtd / packQtd) : 1;
+      const precoNormalGroups = groups * packQtd * unit;
+      const precoComboGroups = groups * comboPrice;
+      const desconto = Math.max(0, precoNormalGroups - precoComboGroups);
+      return { desconto: Math.min(bruto, desconto), promocao: promo };
+    }
+
+    if (String(promo.tipo || '') === 'combo_categoria') {
+      const categoriaPromo = VendaController.normalizarCategoria(promo.categoria);
+      const itensCategoria = (itens || []).filter(
+        (i) => VendaController.normalizarCategoria(i.produto_categoria) === categoriaPromo
+      );
+      if (!itensCategoria.length) return { desconto: 0, promocao: promo };
+      const totalConsumo = itensCategoria.reduce(
+        (sum, i) => sum + Number(i.quantidade || 0) * Math.max(1, Number(i.consumo_estoque || 1)),
+        0
+      );
+      const subtotalCategoria = itensCategoria.reduce((sum, i) => sum + Number(i.subtotal || 0), 0);
+      const packQtd = Math.max(1, Number(promo.quantidade_min || 0));
+      const comboPrice = Number(promo.preco_combo || 0);
+      if (totalConsumo < packQtd || comboPrice <= 0) return { desconto: 0, promocao: promo };
+      const aplicarRepetidamente = Number(promo.repetir_na_venda ?? 1) === 1;
+      const groups = aplicarRepetidamente ? Math.floor(totalConsumo / packQtd) : 1;
+      const unit = totalConsumo > 0 ? subtotalCategoria / totalConsumo : 0;
       const precoNormalGroups = groups * packQtd * unit;
       const precoComboGroups = groups * comboPrice;
       const desconto = Math.max(0, precoNormalGroups - precoComboGroups);
@@ -525,6 +602,11 @@ class VendaController {
       if (!produto) {
         return res.status(404).json({ error: 'Produto não encontrado' });
       }
+      const opcaoSelecionada = acharOpcaoProduto(produto, observacoes);
+      const qtd = parseInt(quantidade, 10);
+      if (!qtd || qtd < 1) {
+        return res.status(400).json({ error: 'Quantidade inválida' });
+      }
 
       // verifica se produto é temporário/avulso (não controla estoque)
       const avulso = isAvulso(produto);
@@ -536,14 +618,12 @@ class VendaController {
         if (produto.estoque <= 0) {
           return res.status(400).json({ error: 'Produto sem estoque' });
         }
-        if (produto.estoque < quantidade) {
+        if (produto.estoque < qtd) {
           return res.status(400).json({ error: 'Estoque insuficiente' });
         }
-      }
-
-      const qtd = parseInt(quantidade, 10);
-      if (!qtd || qtd < 1) {
-        return res.status(400).json({ error: 'Quantidade inválida' });
+        if (opcaoSelecionada && opcaoSelecionada.estoque !== null && Number(opcaoSelecionada.estoque) < qtd) {
+          return res.status(400).json({ error: `Variação "${opcaoSelecionada.nome}" sem estoque suficiente` });
+        }
       }
 
       const obsNorm = String(observacoes || '').trim() || null;
@@ -583,7 +663,7 @@ class VendaController {
         }
         await VendaModel.obterTotal(id);
         await VendaController.aplicarPromocaoAutomaticaSeElegivel(id);
-        if (Number(produto.vai_cozinha) === 1 && ['aberta', 'pronta'].includes(venda.status)) {
+        if ((await produtoVaiParaCozinha(produto)) && ['aberta', 'pronta'].includes(venda.status)) {
           await VendaModel.atualizar(id, { status: 'em_preparo' });
           broadcast('venda.status', { id: parseInt(id, 10), status: 'em_preparo' });
         }
@@ -594,7 +674,7 @@ class VendaController {
           observacoes: obsNorm
         });
         broadcast('venda.item', { venda_id: parseInt(id, 10), produto_id, acao: 'incrementado' });
-        if (Number(produto.vai_cozinha) === 1) {
+        if (await produtoVaiParaCozinha(produto)) {
           await tentarImpressaoAutomatica({
             vendaId: parseInt(id, 10),
             tipo: 'cozinha',
@@ -625,18 +705,21 @@ class VendaController {
       // Baixar estoque apenas se não tratar-se de avulso
       if(!avulso){
         await ProdutoModel.atualizarEstoque(produto_id, -(qtd * consumo));
+        if (opcaoSelecionada) {
+          await ajustarEstoqueOpcaoProduto(produto_id, opcaoSelecionada.nome, -qtd);
+        }
       }
 
       // Atualizar total da venda
       await VendaModel.obterTotal(id);
       await VendaController.aplicarPromocaoAutomaticaSeElegivel(id);
-      if (Number(produto.vai_cozinha) === 1 && ['aberta', 'pronta'].includes(venda.status)) {
+      if ((await produtoVaiParaCozinha(produto)) && ['aberta', 'pronta'].includes(venda.status)) {
         await VendaModel.atualizar(id, { status: 'em_preparo' });
         broadcast('venda.status', { id: parseInt(id, 10), status: 'em_preparo' });
       }
       await registrarHistorico('item_adicionado', parseInt(id, 10), { item_id: itemId, produto_id, quantidade: qtd, observacoes: obsNorm, preco_unitario: precoUnitario });
       broadcast('venda.item', { venda_id: parseInt(id, 10), produto_id, item_id: itemId, acao: 'adicionado' });
-      if (Number(produto.vai_cozinha) === 1) {
+      if (await produtoVaiParaCozinha(produto)) {
         await tentarImpressaoAutomatica({
           vendaId: parseInt(id, 10),
           tipo: 'cozinha',
@@ -667,6 +750,11 @@ class VendaController {
       // Devolver estoque
       const consumo = Math.max(1, Number(item.consumo_estoque || 1));
       await ProdutoModel.atualizarEstoque(item.produto_id, item.quantidade * consumo);
+      const produtoItem = await ProdutoModel.obterPorId(item.produto_id);
+      const opcaoItem = acharOpcaoProduto(produtoItem, item.observacoes);
+      if (opcaoItem) {
+        await ajustarEstoqueOpcaoProduto(item.produto_id, opcaoItem.nome, item.quantidade);
+      }
 
       // Remover item
       await VendaItemModel.deletar(item_id);
@@ -713,6 +801,7 @@ class VendaController {
       if (!produto) {
         return res.status(404).json({ error: 'Produto não encontrado' });
       }
+      const opcaoItem = acharOpcaoProduto(produto, item.observacoes);
 
       // Verificar estoque (não para avulsos)
       const isAvulso = produto.nome.includes('Avulso') && produto.estoque >= 9999;
@@ -722,9 +811,15 @@ class VendaController {
         if (diferenca > 0 && produto.estoque < diferenca * consumo) {
           return res.status(400).json({ error: 'Estoque insuficiente' });
         }
+        if (opcaoItem && opcaoItem.estoque !== null && diferenca > 0 && Number(opcaoItem.estoque) < diferenca) {
+          return res.status(400).json({ error: `Variação "${opcaoItem.nome}" sem estoque suficiente` });
+        }
         // Ajustar estoque: se aumenta quantidade, baixa estoque; se diminui, devolve
         if (diferenca !== 0) {
           await ProdutoModel.atualizarEstoque(item.produto_id, -(diferenca * consumo));
+          if (opcaoItem) {
+            await ajustarEstoqueOpcaoProduto(item.produto_id, opcaoItem.nome, -diferenca);
+          }
         }
       }
 
@@ -738,7 +833,7 @@ class VendaController {
       // Atualizar total
       await VendaModel.obterTotal(id);
       await VendaController.aplicarPromocaoAutomaticaSeElegivel(id);
-      if (Number(produto.vai_cozinha) === 1 && ['aberta', 'pronta'].includes(venda.status)) {
+      if ((await produtoVaiParaCozinha(produto)) && ['aberta', 'pronta'].includes(venda.status)) {
         await VendaModel.atualizar(id, { status: 'em_preparo' });
         broadcast('venda.status', { id: parseInt(id, 10), status: 'em_preparo' });
       }
@@ -747,7 +842,7 @@ class VendaController {
         quantidade
       });
       broadcast('venda.item', { venda_id: parseInt(id, 10), item_id: parseInt(item_id, 10), acao: 'atualizado' });
-      if (Number(produto.vai_cozinha) === 1) {
+      if (await produtoVaiParaCozinha(produto)) {
         await tentarImpressaoAutomatica({
           vendaId: parseInt(id, 10),
           tipo: 'cozinha',
