@@ -78,7 +78,6 @@ class API {
         return this.request('POST', '/produtos', dados);
     }
 
-<<<<<<< HEAD
     static async criarProdutosLote(categoria, itens) {
         return this.request('POST', '/produtos/lote', { categoria, itens });
     }
@@ -88,24 +87,6 @@ class API {
             categoria_atual: categoriaAtual,
             categoria_nova: categoriaNova
         });
-=======
-    // ===== CATEGORIAS =====
-    static async listarCategorias(ativas = false) {
-        const query = ativas ? '?ativas=true' : '';
-        return this.request('GET', `/categorias${query}`);
-    }
-
-    static async criarCategoria(dados) {
-        return this.request('POST', '/categorias', dados);
-    }
-
-    static async atualizarCategoria(id, dados) {
-        return this.request('PUT', `/categorias/${id}`, dados);
-    }
-
-    static async removerCategoria(id) {
-        return this.request('DELETE', `/categorias/${id}`);
->>>>>>> de082d523ba64c5da2e1d8b0a8a008b9018ee045
     }
 
     static async atualizarProduto(id, dados) {
