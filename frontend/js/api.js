@@ -89,6 +89,22 @@ class API {
         });
     }
 
+    static async listarCategorias() {
+        return this.request('GET', '/categorias');
+    }
+
+    static async criarCategoria(dados) {
+        return this.request('POST', '/categorias', dados);
+    }
+
+    static async atualizarCategoria(id, dados) {
+        return this.request('PUT', `/categorias/${id}`, dados);
+    }
+
+    static async removerCategoria(id) {
+        return this.request('DELETE', `/categorias/${id}`);
+    }
+
     static async atualizarProduto(id, dados) {
         return this.request('PUT', `/produtos/${id}`, dados);
     }

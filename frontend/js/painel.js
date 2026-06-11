@@ -30,6 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (target === 'mesas') carregarMesas();
     if (target === 'clientes') carregarClientes();
     if (target === 'promocoes') carregarPromocoes();
+    if (target === 'produtos') carregarProdutosCompleto();
   }
 
   if (tabViaQuery && ['home', 'produtos', 'mesas', 'clientes', 'promocoes'].includes(tabViaQuery)) {
@@ -1163,28 +1164,51 @@ document.addEventListener('DOMContentLoaded', () => {
       return { key: 'anotado', label: 'Anotado', color: '#f59e0b', bg: '#fff7ed' };
     };
 
+    // Agrupa itens com mesmo produto+variação+preço para exibição unificada
+    const agruparItensComanda = (lista) => {
+      const map = new Map();
+      for (const item of lista) {
+        const key = `${item.produto_nome}||${String(item.observacoes || '').trim()}||${Number(item.preco_unitario || 0)}`;
+        if (map.has(key)) {
+          const g = map.get(key);
+          g.quantidade += Number(item.quantidade || 0);
+          g.subtotal = Number((g.quantidade * Number(g.preco_unitario || 0)).toFixed(2));
+          g._idsGrupo.push(item.id);
+        } else {
+          map.set(key, { ...item, quantidade: Number(item.quantidade || 0), subtotal: Number(item.subtotal || 0), _idsGrupo: [item.id] });
+        }
+      }
+      return [...map.values()];
+    };
+
     const renderItemMesa = (i) => {
       const st = getStatusItem(i);
       const proximoStatus = st.key === 'anotado' ? 'saiu' : 'anotado';
       const rotuloBotao = st.key === 'anotado' ? 'Marcar saiu' : 'Voltar anotado';
+      const idRef = i._idsGrupo ? i._idsGrupo[0] : i.id;
+      const idsGrupo = i._idsGrupo || [i.id];
+      // Para cancelar grupo, usamos onclick em série
+      const cancelarCmds = idsGrupo.map((iid) => `cancelarPedidoItem(${venda.id},${iid})`).join(';');
+      const statusCmds = idsGrupo.map((iid) => `atualizarStatusPedidoItem(${venda.id},${iid},'${proximoStatus}')`).join(';');
+      const agrupado = idsGrupo.length > 1 ? ` <span style="font-size:10px;color:#94a3b8">(${idsGrupo.length} pedidos)</span>` : '';
       return `<div class="mesa-item-card ${st.key}">
         <div class="mesa-item-main">
-          <strong>${i.produto_nome}</strong>
+          <strong>${i.produto_nome}</strong>${agrupado}
           ${i.observacoes ? `<small>${i.observacoes}</small>` : ''}
           <small>x${i.quantidade} • ${formatarMoedaBR(i.preco_unitario || 0)} un • ${formatarMoedaBR(i.subtotal || 0)}</small>
           <span style="display:inline-block;margin-top:6px;padding:2px 7px;border-radius:999px;font-size:10px;font-weight:700;color:${st.color};background:#fff">${st.label}</span>
         </div>
         <div class="mesa-item-actions">
-          <button class="btn btn-small btn-secondary" onclick="alterarQuantidadeMesa(${venda.id},${i.id},-1)" ${comandaFechada ? 'disabled' : ''}>-</button>
+          <button class="btn btn-small btn-secondary" onclick="alterarQuantidadeMesa(${venda.id},${idRef},-1)" ${comandaFechada ? 'disabled' : ''}>-</button>
           <span style="min-width:22px;text-align:center;font-size:12px;font-weight:700">${i.quantidade}</span>
-          <button class="btn btn-small btn-secondary" onclick="alterarQuantidadeMesa(${venda.id},${i.id},1)" ${comandaFechada ? 'disabled' : ''}>+</button>
-          <button class="btn btn-small btn-primary" onclick="atualizarStatusPedidoItem(${venda.id},${i.id},'${proximoStatus}')" ${comandaFechada ? 'disabled' : ''}>${rotuloBotao}</button>
-          <button class="btn btn-small btn-danger" onclick="cancelarPedidoItem(${venda.id},${i.id})" ${comandaFechada ? 'disabled' : ''}>Cancelar</button>
+          <button class="btn btn-small btn-secondary" onclick="alterarQuantidadeMesa(${venda.id},${idRef},1)" ${comandaFechada ? 'disabled' : ''}>+</button>
+          <button class="btn btn-small btn-primary" onclick="${statusCmds}" ${comandaFechada ? 'disabled' : ''}>${rotuloBotao}</button>
+          <button class="btn btn-small btn-danger" onclick="${cancelarCmds}" ${comandaFechada ? 'disabled' : ''}>Cancelar</button>
         </div>
       </div>`;
     };
-    const itensJaSaiu = itens.filter((i) => String(i.status_item || 'anotado').toLowerCase() === 'saiu');
-    const itensAnotados = itens.filter((i) => String(i.status_item || 'anotado').toLowerCase() !== 'saiu');
+    const itensJaSaiu = agruparItensComanda(itens.filter((i) => String(i.status_item || 'anotado').toLowerCase() === 'saiu'));
+    const itensAnotados = agruparItensComanda(itens.filter((i) => String(i.status_item || 'anotado').toLowerCase() !== 'saiu'));
     const itensHtml = itens.length === 0
       ? '<p style="color:#666;margin:0">Sem itens</p>'
       : `${itensAnotados.length ? `<div class="mesa-grupo-titulo">Pedido anotado</div>${itensAnotados.map(renderItemMesa).join('')}` : ''}
@@ -1485,81 +1509,140 @@ document.addEventListener('DOMContentLoaded', () => {
   function renderProdutosList(produtos) {
     const el = document.getElementById('prodList');
     if (!el) return;
+
     const termo = String(filtroProdutoEstoque || '').toLowerCase().trim();
     const filtered = produtos.filter((p) => {
       if (p.tipo === 'avulso') return false;
-      if (!termo) return true;
       const nome = String(p.nome || '').toLowerCase();
       const categoria = String(p.categoria || '').toLowerCase();
-      return nome.includes(termo) || categoria.includes(termo);
+      if (termo && !nome.includes(termo) && !categoria.includes(termo)) return false;
+      return true;
     });
     const filtradoCategoria =
       filtroCategoriaEstoque === 'todas'
         ? filtered
         : filtered.filter((p) => normalizarCategoria(p.categoria) === filtroCategoriaEstoque);
+
     if (!filtradoCategoria.length) {
       el.innerHTML = '<p style="font-size:12px;color:#64748b">Nenhum produto encontrado.</p>';
       return;
     }
-    const grouped = filtered.reduce((acc, p) => {
-      const cat = normalizarCategoria(p.categoria);
-      if (!acc[cat]) acc[cat] = [];
-      acc[cat].push(p);
-      return acc;
-    }, {});
-    const renderProdutoEstoque = (p) =>
-      `<div class="product-list-item" data-id="${p.id}"><div><div class="product-list-item-name">#${p.id} ${p.nome} ${Number(p.destaque || 0) === 1 ? '<span style="color:#f59e0b">★</span>' : ''}</div><div style="font-size:11px;color:#999">pop ${Number(p.popularidade || 0)} • ${p.tipo}${Number(p.vai_cozinha || 0) === 1 ? ' • cozinha' : ''}</div></div><div class="product-list-item-info"><span class="qty">${p.estoque} un</span><span class="price">${formatarMoedaBR(p.preco)}</span><button onclick="deletarProduto(${p.id})" class="delete-btn">X</button></div></div>`;
 
-    el.innerHTML = Object.keys(grouped)
-      .sort((a, b) => a.localeCompare(b, 'pt-BR'))
-      .map((cat) => {
-        const itensCategoria = grouped[cat].sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR'));
-        return `<section class="stock-category-section">
-          <div class="stock-category-header">
-            <div class="stock-category-title">
-              <strong>${rotuloCategoria(cat)}</strong>
-              <span>${itensCategoria.length} produto(s)</span>
-            </div>
-            <button class="btn btn-secondary btn-soft btn-renomear-categoria" type="button" data-categoria="${cat}">Renomear</button>
-          </div>
-          <div class="stock-category-items">${itensCategoria.map(renderProdutoEstoque).join('')}</div>
-        </section>`;
-      })
+    // Agrupar por categoria
     const agrupado = filtradoCategoria.reduce((acc, p) => {
       const cat = normalizarCategoria(p.categoria);
       if (!acc[cat]) acc[cat] = [];
       acc[cat].push(p);
       return acc;
     }, {});
-    const cats = Object.keys(agrupado).sort();
-    el.innerHTML = cats
-      .map((cat) => {
-        const rows = agrupado[cat]
-          .map(
-            (p) =>
-              `<div class="product-list-item" data-id="${p.id}"><div><div class="product-list-item-name">#${p.id} ${p.nome} ${Number(p.destaque || 0) === 1 ? '<span style="color:#f59e0b">★</span>' : ''}</div><div style="font-size:11px;color:#999">${rotuloCategoria(p.categoria)} • pop ${Number(p.popularidade || 0)} • ${p.tipo}${produtoVaiCozinhaUI(p) ? ' • cozinha' : ''}</div></div><div class="product-list-item-info"><span class="qty">${p.estoque} un</span><span class="price">${formatarMoedaBR(p.preco)}</span><button onclick="deletarProduto(${p.id})" class="delete-btn">X</button></div></div>`
-          )
-          .join('');
-        return `<div style="margin-bottom:10px"><div style="font-size:12px;font-weight:700;color:#0f172a;margin:8px 0 6px">${rotuloCategoria(cat)}</div>${rows}</div>`;
-      })
-      .join('');
-    el.querySelectorAll('.product-list-item').forEach((item) => {
-      item.addEventListener('click', () => {
-        const id = item.dataset.id;
-        selecionarProduto(id);
+    const cats = Object.keys(agrupado).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+
+    // Opções de categorias disponíveis para o bulk-move
+    const catsDisponiveis = categoriasCache.length
+      ? categoriasCache.filter((c) => Number(c.ativo || 0) === 1).map((c) => normalizarCategoria(c.nome)).filter(Boolean).sort((a,b) => a.localeCompare(b,'pt-BR'))
+      : [...new Set(filtradoCategoria.map((p) => normalizarCategoria(p.categoria)))].sort();
+    const catOptions = catsDisponiveis.map((c) => `<option value="${c}">${rotuloCategoria(c)}</option>`).join('');
+
+    const renderRow = (p) =>
+      `<div class="product-list-item" data-id="${p.id}" style="gap:8px;align-items:center">
+        <input type="checkbox" class="produto-checkbox" data-id="${p.id}" onclick="event.stopPropagation()">
+        <div style="flex:1;min-width:0">
+          <div class="product-list-item-name">#${p.id} ${p.nome}${Number(p.destaque || 0) === 1 ? ' <span style="color:#f59e0b">\u2605</span>' : ''}</div>
+          <div style="font-size:11px;color:#999">${rotuloCategoria(p.categoria)} \u2022 pop ${Number(p.popularidade || 0)} \u2022 ${p.tipo}${produtoVaiCozinhaUI(p) ? ' \u2022 cozinha' : ''}</div>
+        </div>
+        <div class="product-list-item-info">
+          <span class="qty">${p.estoque} un</span>
+          <span class="price">${formatarMoedaBR(p.preco)}</span>
+          <button onclick="deletarProduto(${p.id})" class="delete-btn">X</button>
+        </div>
+      </div>`;
+
+    el.innerHTML = cats.map((cat) => {
+      const itens = agrupado[cat].sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR'));
+      return `<section class="stock-category-section">
+        <div class="stock-category-header">
+          <div class="stock-category-title" style="gap:8px">
+            <input type="checkbox" class="produto-checkbox cat-check-all" data-categoria="${cat}" title="Selecionar todos" onclick="event.stopPropagation()">
+            <strong>${rotuloCategoria(cat)}</strong>
+            <span>${itens.length} produto(s)</span>
+          </div>
+          <button class="btn btn-secondary btn-soft btn-renomear-categoria" type="button" data-categoria="${cat}">Renomear</button>
+        </div>
+        <div class="stock-category-items">${itens.map(renderRow).join('')}</div>
+      </section>`;
+    }).join('') +
+    `<div class="bulk-action-bar" id="bulkActionBar" style="display:none">
+      <span class="bulk-count" id="bulkCount">0 selecionados</span>
+      <select id="bulkCatSelect">${catOptions}</select>
+      <button class="btn btn-primary" id="btnBulkMover" type="button">Mover para categoria</button>
+      <button class="btn btn-secondary" id="btnBulkDesmarcar" type="button">Desmarcar tudo</button>
+    </div>`;
+
+    // Atualizar barra de ação ao marcar/desmarcar
+    const updateBulkBar = () => {
+      const selecionados = [...el.querySelectorAll('.produto-checkbox[data-id]:checked')];
+      const bar = el.querySelector('#bulkActionBar');
+      const cnt = el.querySelector('#bulkCount');
+      if (bar) bar.style.display = selecionados.length ? 'flex' : 'none';
+      if (cnt) cnt.textContent = `${selecionados.length} selecionado${selecionados.length !== 1 ? 's' : ''}`;
+    };
+
+    el.querySelectorAll('.produto-checkbox[data-id]').forEach((cb) => cb.addEventListener('change', updateBulkBar));
+
+    // Checkbox "selecionar todos" por categoria
+    el.querySelectorAll('.cat-check-all').forEach((cbAll) => {
+      cbAll.addEventListener('change', () => {
+        const cat = cbAll.dataset.categoria;
+        el.querySelectorAll('.produto-checkbox[data-id]').forEach((cb) => {
+          const prod = filtradoCategoria.find((p) => String(p.id) === String(cb.dataset.id));
+          if (prod && normalizarCategoria(prod.categoria) === cat) cb.checked = cbAll.checked;
+        });
+        updateBulkBar();
       });
     });
+
+    // Mover em lote
+    el.querySelector('#btnBulkMover')?.addEventListener('click', async () => {
+      const ids = [...el.querySelectorAll('.produto-checkbox[data-id]:checked')].map((cb) => cb.dataset.id);
+      const novaCategoria = el.querySelector('#bulkCatSelect')?.value;
+      if (!ids.length || !novaCategoria) return;
+      if (!(await uiConfirm(`Mover ${ids.length} produto(s) para "${rotuloCategoria(novaCategoria)}"?`, { title: 'Mudar categoria' }))) return;
+      try {
+        await Promise.all(ids.map((id) => API.atualizarProduto(id, { categoria: novaCategoria })));
+        uiNotify(`${ids.length} produto(s) movidos para ${rotuloCategoria(novaCategoria)}`, 'success');
+        await carregarProdutosCompleto();
+      } catch (e) {
+        await uiAlert(e.message || 'Erro ao mover produtos', 'error');
+      }
+    });
+
+    // Desmarcar tudo
+    el.querySelector('#btnBulkDesmarcar')?.addEventListener('click', () => {
+      el.querySelectorAll('.produto-checkbox').forEach((cb) => { cb.checked = false; });
+      updateBulkBar();
+    });
+
+    // Clique na linha → selecionar produto para edição
+    el.querySelectorAll('.product-list-item').forEach((item) => {
+      item.addEventListener('click', (ev) => {
+        if (ev.target.closest('.produto-checkbox') || ev.target.closest('.delete-btn')) return;
+        selecionarProduto(item.dataset.id);
+      });
+    });
+
     el.querySelectorAll('.btn-renomear-categoria').forEach((btn) => {
       btn.addEventListener('click', (ev) => {
         ev.stopPropagation();
         renomearCategoriaEstoque(btn.dataset.categoria || '');
       });
     });
+
     if (window.produtoSelecionado) {
       const sel = el.querySelector(`.product-list-item[data-id="${window.produtoSelecionado}"]`);
       if (sel) sel.classList.add('selected');
     }
   }
+
 
   let produtoImagemBase64 = null;
   window.produtoSelecionado = null;

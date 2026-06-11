@@ -445,31 +445,31 @@
     }
 
     .main-content > h2 {
-      font-size: 20px;
-      margin-bottom: 10px;
+      font-size: 19px;
+      margin-bottom: 8px;
     }
 
     .sidebar h3 {
-      font-size: 16px;
-      padding-bottom: 7px;
-      margin-bottom: 10px;
+      font-size: 15px;
+      padding-bottom: 6px;
+      margin-bottom: 8px;
     }
 
     .products-main {
-      grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
-      gap: 10px;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 8px;
     }
 
     .product-card {
       align-items: stretch;
       text-align: left;
-      padding: 10px;
-      min-height: 156px;
+      padding: 9px;
+      min-height: 136px;
     }
 
     .product-image {
-      height: 86px;
-      margin-bottom: 8px;
+      height: 70px;
+      margin-bottom: 6px;
     }
 
     .product-name,
@@ -481,7 +481,7 @@
 
     .product-price,
     .produto-mesa-card-price {
-      font-size: 15px;
+      font-size: 14px;
     }
 
     .product-meta {
@@ -490,26 +490,26 @@
     }
 
     .produtos-mesa-grid {
-      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      grid-template-columns: repeat(auto-fill, minmax(136px, 1fr));
       gap: 8px;
     }
 
     .produto-mesa-card {
       text-align: left;
-      padding: 9px;
-      min-height: 132px;
+      padding: 8px;
+      min-height: 116px;
     }
 
     .produto-mesa-card-img {
-      height: 62px;
+      height: 52px;
     }
 
     .product-list {
-      gap: 6px;
+      gap: 5px;
     }
 
     .product-list-item {
-      padding: 9px 10px;
+      padding: 8px 10px;
     }
 
     .product-list-item-info {
@@ -525,7 +525,7 @@
 
     .category-chip {
       font-size: 13px;
-      padding: 7px 11px;
+      padding: 6px 11px;
       border-radius: 8px;
     }
 
@@ -534,11 +534,31 @@
       letter-spacing: 0;
     }
 
+    /* === Correção principal: fontes legíveis em todos os campos ===
+       font-size!important é necessário para sobrescrever estilos inline
+       dispersos pelo HTML (style="font-size:12px") */
     input,
     select,
     textarea {
-      font-size: 14px;
-      padding: 10px;
+      font-size: 14px !important;
+      padding: 9px 10px;
+    }
+
+    label {
+      font-size: 13px !important;
+    }
+
+    /* Botões da sidebar ficam legíveis */
+    .sidebar .btn,
+    .sidebar .pad-key {
+      font-size: 13px !important;
+    }
+
+    /* Textos de meta/detalhe dentro da sidebar */
+    .sidebar small,
+    .sidebar [style*="font-size:11px"],
+    .sidebar [style*="font-size:12px"] {
+      font-size: 12px;
     }
 
     @media (max-width: 1100px) {

@@ -1615,3 +1615,84 @@ textarea:focus {
         max-height: 94vh;
     }
 }
+
+/* ===================================
+   SIDEBAR TABS (sub-abas)
+   =================================== */
+.sidebar-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 12px;
+    background: #f1f5f9;
+    border-radius: 8px;
+    padding: 3px;
+}
+
+.sidebar-tab {
+    flex: 1;
+    border: none;
+    background: transparent;
+    color: #64748b;
+    font-size: 13px;
+    font-weight: 600;
+    padding: 7px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.sidebar-tab:hover {
+    color: #0f172a;
+    background: rgba(255,255,255,0.7);
+}
+
+.sidebar-tab.active {
+    background: #ffffff;
+    color: var(--primary);
+    box-shadow: 0 1px 3px rgba(15,23,42,0.10);
+}
+
+.sidebar-tab-content {
+    /* conteúdo visível por padrão; .hidden oculta */
+}
+
+/* ===================================
+   SELEÇÃO MÚLTIPLA DE PRODUTOS
+   =================================== */
+.produto-checkbox {
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+    accent-color: var(--primary);
+    flex-shrink: 0;
+}
+
+.bulk-action-bar {
+    position: sticky;
+    bottom: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
+    background: #fff;
+    border: 1px solid var(--primary);
+    border-radius: 8px;
+    margin-top: 8px;
+    box-shadow: 0 -2px 8px rgba(37,99,235,0.10);
+    flex-wrap: wrap;
+}
+
+.bulk-action-bar select {
+    flex: 1;
+    min-width: 140px;
+    font-size: 13px;
+    padding: 7px 10px;
+}
+
+.bulk-action-bar .bulk-count {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--primary);
+    white-space: nowrap;
+}
